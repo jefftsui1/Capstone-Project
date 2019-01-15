@@ -1,0 +1,48 @@
+<center>
+	#Capstone Ideas
+	</center>
+	
+
+	
+
+	######By Jeff Tsui
+	
+
+	Create a document (on Google Doc or Github) with three ideas for your capstone project. Your writeup should contain a short blurb about each of your ideas. The blurb should describe a problem and the data you’ll be using to solve it.
+	
+
+	
+
+	**Idea 1. Average SAT scores for NYC Public High School **
+	* Comparing SAT scores vs different boroughs.
+	* Comparing SAT scores vs enrollment sizes.
+	    + Finding out which boroughs have the highest SAT scores.
+	    + Comparing the SAT scores with enrollments sizes to see if smaller class size have an impact on the SAT scores.
+	    
+	    
+	    
+	* Source:
+	<center>https://www.kaggle.com/nycopendata/high-schools</center>
+	 
+	**Idea 2. Criminal activities in the NYC **
+	* Looking at data of past crime report.
+	    + Find out the hotspot of different types of crimes.
+	
+
+	    
+	    
+	* Source:
+	    
+	<center>https:https://data.cityofnewyork.us/Public-Safety/NYPD-Complaint-Map-Year-to-Date-/2fra-mtpn</center>
+	<center>https://www1.nyc.gov/site/nypd/stats/crime-statistics/historical.page</center>
+	  
+	**Idea 3. Flight delays and cancellations **
+	* Looking at the past flight delays and cancellation and finding out which is the best airline to take.  
+	    + Reason of the delays and cancellations.
+	    + narrow down the problem and reduce delay.
+	    
+	    
+	    
+	* Source:
+	<center>https://www.kaggle.com/usdot/flight-delays</center>
+
