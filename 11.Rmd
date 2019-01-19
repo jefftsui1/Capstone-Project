@@ -1,0 +1,28 @@
+<center>
+# Finalize Capstone Project
+</center>
+
+#### Criminal activities in the New York City
+
+##### By Jeff Tsui
+
+
+**What is the problem you want to solve?**
+
+* Different types of criminal activity can happen anywhere in the city. Some neighborhood have more crimes, others have less. From the data of past crime reports, we can identify the hotspots for different type of crime for saferty concerns.
+
+**Who is your client and why do they care about this problem? In other words, what will your client DO or DECIDE based on your analysis that they wouldn't have otherwise?**
+
+* Clients will be the civilians and tourists of the New York City. They care about this problem because of their own safety concerns. With the method of allowing the clients to check the locations of the crime hotspots, this could navigate them to a safer route to get to their destinations.
+
+**What data are you going to use for this? How will you acquire this data?**
+
+* Datasets from Crime reports in NYC are availabe at [NYC Opendata](https://data.cityofnewyork.us). I will be using the datasets of [Incident Level Complaint Data - 2006 through 2017](https://data.cityofnewyork.us/Public-Safety/NYPD-Complaint-Data-Historic/qgea-i56i) and [Incident Level Complaint Data - current year through most recent full quarter](https://data.cityofnewyork.us/Public-Safety/NYPD-Complaint-Data-Current-Year-To-Date-/5uac-w243). These two datasets contain the incident level complaint from the beginning of January 2006 to the end of June 2018. The variables that I will be working on will be borough, date of the complaint, time of the complaint, level of offense, description of the offense, description of the premise, suspect's age group, suspect's race, suspect's sex, victim's age group, victim's race, and victim's sex.
+
+**In brief, outline your approach to solving this problem (knowing that this might change later).**
+
+* After cleaning the datasets, I will use [MapCustomizer](https://www.mapcustomizer.com/#) to list out the hotspot for different crimes. The approach might change after learning data wrangling and exploratory data analysis in R.
+
+**What are your deliverables? Typically, this would include code, along with a paper and/or a slide deck.**
+
+* The deliverables will be uploaded to GitHub, all findings and code will be presented with a slide deck. The deliverables might change after learning data wrangling, exploratory data analysis in R, and Data story.
