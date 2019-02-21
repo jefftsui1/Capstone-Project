@@ -65,7 +65,7 @@ The line graph below shows the changes more clearly, there is a trend of decreas
 ``` {r echo = FALSE}
 ggplot(AllComplaint, aes(x = Year_Month, y = (..count..))) + 
   geom_bar(col = "Red") +
-  xlab("Month")
+  xlab("Month") +
   ylab("Number of Crimes") +
   ggtitle("Total Public Crime Complaints Per Year Between 2010 to 2017") +
   theme(plot.title = element_text(hjust = 0.5))
