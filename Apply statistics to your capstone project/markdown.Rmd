@@ -1,0 +1,200 @@
+---
+title: "Public Crimes That Affects Other People in NYC"
+author: "Jeff Tsui"
+date: "February 20, 2019"
+output: 
+html_document:
+  keep_md: yes
+  Pdf_document: default
+---
+Load  the library
+```{r message = FALSE}
+library(dplyr)
+library(tidyr)
+library(scales)
+library(plyr)
+library(lubridate)
+library(ggplot2)
+library(GGally)
+library(zoo)
+```
+
+
+Load the dataframe 
+``` {r echo = FALSE}
+AllComplaint <- read.csv("C:/Users/Jayden/Desktop/Springboard/Data-Wrangling-Capstone-Project/New/AllComplaints.csv", header = T)
+AllComplaint$Year <- year(as.Date(AllComplaint$Complaint_Date, "%Y-%m-%d"))
+AllComplaint <- transform(AllComplaint, yearmon = as.yearmon(AllComplaint$Complaint_Date))
+AllComplaint <- AllComplaint[, -c(1)]
+AllComplaint<- AllComplaint[, c(1, 2, 14, 15, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13)]
+colnames(AllComplaint)[colnames(AllComplaint) == "yearmon"] <- "Year_Month"
+```
+
+The dataframe only included the reported complaints of crimes that affected other people in the public. The public premises includes: "bus stop", "open areas (open lots)", "park/playground", "public buildings", "street", "transit (bus)", and "transit (subway)".  The public crimes includes: "arson", "assault level 3 and related offenses", "danagerous weapons", "felony assault", "harrassment level 2", "kidnapping", "murder and non-negligent", "manslaughter", "rape", "robbery", and "sex crimes". The complaint reported for public crimes are 11.8% of all reported crimes between 2010 to 2017.
+
+##Analysis of Crime Complaints that happened in the Public that Violates Other People
+=====================================================================================
+
+``` {r echo = FALSE}
+ggplot(AllComplaint, aes(x = Year, y = (..count..))) + 
+  geom_bar(col = "Red") +
+  ylab("Number of Crimes") +
+  ggtitle("Total Public Crime Complaints Per Year Between 2010 to 2017") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+``` {r echo = FALSE}
+ggplot(data = AllComplaint, aes(Year)) + 
+  geom_line(stat = "count") + 
+  geom_point(stat = "count") + 
+  ylab("Number of Crimes") +
+  ggtitle("Total Public Crime Complaints Per Year Between 2010 to 2017") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+``` {r echo = FALSE}
+length(which(AllComplaint$Year == 2010))
+length(which(AllComplaint$Year == 2017))
+
+(length(which(AllComplaint$Year == 2010))-length(which(AllComplaint$Year == 2017)))/length(which(AllComplaint$Year == 2010))
+```
+
+The line graph below shows the changes more clearly, there is a trend of decreasing public crimes between 2010 to 2017. There is a 16.38% decrease of public crimes between 2010 to 2017.
+
+
+``` {r echo = FALSE}
+ggplot(AllComplaint, aes(x = Year_Month, y = (..count..))) + 
+  geom_bar(col = "Red") +
+  xlab("Month")
+  ylab("Number of Crimes") +
+  ggtitle("Total Public Crime Complaints Per Year Between 2010 to 2017") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+``` {r echo = FALSE}
+ggplot(data = AllComplaint, aes(Year_Month)) + 
+  geom_line(stat = "count") + 
+  geom_point(stat = "count") + 
+  ylab("Number of Crimes") +
+  ggtitle("Total Public Crime Complaints Per Month Between 2010 to 2017") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+Looking at the line graph, there is a signigicant decrease of total public crime complaints in the month of November, December, and January for each year. This might be the cause of the weather is too cold to be on the street.
+
+
+``` {r echo = FALSE}
+ggplot((AllComplaint)) + 
+  geom_bar( aes(x = Borough, y =  (..count..)), col = "red") +
+  ylab("Number of Crimes") +
+  ggtitle("Total Public Crime Complaints Per Borough Between 2010 to 2017") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+``` {r echo = FALSE}
+ggplot(AllComplaint, aes(x = Year, fill = Borough)) +
+  geom_bar(position = "fill") +
+  scale_fill_brewer(palette = "Dark2")+
+  ylab("Percentage of The Total Number of Crimes") +
+  ggtitle("Percentage of Public Crime Complaints Annually For The Five Boroughs") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+Like the percentage of public crime complaints annually for each boroughs, the monthly percentage did not show any significant changes.
+
+``` {r echo = FALSE}
+ggplot(AllComplaint, aes(x = Year_Month, fill = Borough)) +
+  geom_bar(position = "fill") +
+  scale_fill_brewer(palette = "Dark2")+
+  ylab("Percentage of The Total Number of Crimes") +
+  ggtitle("Percentage of Public Crime Complaints Monthly For The Five Boroughs") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+``` {r echo = FALSE}
+ggplot(AllComplaint, aes(x = Year, y = (..count..))) +
+  geom_point(aes(col = Borough),stat = "count") +
+  geom_line(aes(col = Borough), stat = "count") +
+  scale_color_brewer(palette = "Dark2") +
+  theme(panel.grid = element_blank()) +
+  ylab("Number of Crimes") +
+  ggtitle("Total Public Crime Complaints Annually for The Five Borough") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+Looking at the bar graph of the total public crime complaints that happened between 2010 to 2017 for each of the five boroughs. It clearly stated that Staten Island have significantly less complaints than the other four boroughs mainly because of its population size. But Brookyln shows to have significantly more public crime complaints than other boroughs even when Queens have similar population size. Population size are determined by https://www.citypopulation.de/php/usa-newyorkcity.php. 
+The percentage of public crime complaints annually and monthly are somewhat steady for each boroughs. From the line graph "Total Public Crime Complaints Annually for The Five Borough", we can see that Brookyln's public crime complaints have clearer sight of decreasing over the years. But overall the crime for each borough have decreased at the end of 2017.
+
+
+``` {r echo = FALSE}
+ggplot(AllComplaint) +
+  geom_bar( aes(x = Offense.Description, y = stat(count)), col = "red") +
+  theme(panel.grid = element_blank()) +
+  scale_fill_brewer(palette = "Set1") +
+  ylab("Number of Crimes") +
+  ggtitle("Total Public Crime Complaints Annually Per Offense") +
+  coord_flip()
+```
+
+``` {r echo = FALSE}
+ggplot(AllComplaint) +
+  geom_bar( aes(x = Year, y = stat(count), fill = Offense.Description)) +
+  theme(panel.grid = element_blank()) +
+  scale_fill_brewer(palette = "Set1") +
+  ylab("Number of Crimes") +
+  ggtitle("Total Public Crime Complaints Annually Per Offense") 
+```
+
+``` {r echo = FALSE}
+ggplot(AllComplaint, aes(x = Year, y = stat(count), fill = Offense.Description)) +
+  geom_bar(position = "fill") +
+  theme(panel.grid = element_blank()) +
+  scale_fill_brewer(palette = "Set1") +
+  ylab("Percentage of The Total Number of Crimes") +
+  ggtitle("Percentage of The Public Crime Complaints Annually Per Offense") 
+```
+
+``` {r echo = FALSE}
+ggplot(AllComplaint, aes(x = Year, y = (..count..))) +
+  geom_point(aes(col = Offense.Description),stat = "count") +
+  geom_line(aes(col = Offense.Description), stat = "count") +
+  scale_color_brewer(palette = "Set1") +
+  theme(panel.grid = element_blank()) +
+  ylab("Number of Crimes") +
+  ggtitle("Total Public Crime Complaints Annually Per Offenses")
+```
+
+Robbery, assault level 3 & related offenses, and harrassment level 2 are the majority of the public crime complaints that is reported during 2010 to 2017 according to the bar graph "Total Public Crime Complaints Annually Per Offense." Public crimes such as robbery and carrying dangerous weapons have shown significant decrease over the years. Harrassment level 2 have increased over the years.
+
+
+``` {r echo = FALSE}
+ggplot(AllComplaint) +
+  geom_bar( aes(x = Year, y = stat(count), fill = Premises)) +
+  theme(panel.grid = element_blank()) +
+  scale_fill_brewer(palette = "Paired") +
+  ylab("Number of Crimes") +
+  ggtitle("Total Public Crime Complaints Annually in Different Premises") 
+```
+
+``` {r echo = FALSE}
+ggplot(AllComplaint, aes(x = Year, y = (..count..))) +
+  geom_point(aes(col = Premises),stat = "count") +
+  geom_line(aes(col = Premises), stat = "count") +
+  scale_color_brewer(palette = "Paired") +
+  theme(panel.grid = element_blank()) +
+  ylab("Number of Crimes") +
+  ggtitle("Total Public Crime Complaints Annually in Different Premises")
+```
+
+Street crime takes majority of the total public crime complaints.
+
+
+
+##Insights, correlations and further investigations
+===================================================
+
+The public crime complaints have dropped 16.38% over the years of 2010 to 2017. Crimes such as robbery and carrying dangerous weapons have shown significant decrease, while harrassment level 2 have increased sightly over the years.
+
+Correlations" The public crime rate have dropped significantly during the winter season.
+
+My next step could be creating a heatmap with all the latitude and longitude provided in the dataframe. And provide more correlations.  
