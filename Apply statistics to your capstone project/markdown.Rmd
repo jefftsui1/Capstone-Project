@@ -32,7 +32,7 @@ colnames(AllComplaint)[colnames(AllComplaint) == "yearmon"] <- "Year_Month"
 
 The dataframe only included the reported complaints of crimes that affected other people in the public. The public premises includes: "bus stop", "open areas (open lots)", "park/playground", "public buildings", "street", "transit (bus)", and "transit (subway)".  The public crimes includes: "arson", "assault level 3 and related offenses", "danagerous weapons", "felony assault", "harrassment level 2", "kidnapping", "murder and non-negligent", "manslaughter", "rape", "robbery", and "sex crimes". The complaint reported for public crimes are 11.8% of all reported crimes between 2010 to 2017.
 
-##Analysis of Crime Complaints that happened in the Public that Violates Other People
+Analysis of Crime Complaints that happened in the Public that Violates Other People
 =====================================================================================
 
 ``` {r echo = FALSE}
@@ -128,7 +128,7 @@ The percentage of public crime complaints annually and monthly are somewhat stea
 
 ``` {r echo = FALSE}
 ggplot(AllComplaint) +
-  geom_bar( aes(x = Offense.Description, y = stat(count)), col = "red") +
+  geom_bar( aes(x = Offense_Description, y = stat(count)), col = "red") +
   theme(panel.grid = element_blank()) +
   scale_fill_brewer(palette = "Set1") +
   ylab("Number of Crimes") +
@@ -138,7 +138,7 @@ ggplot(AllComplaint) +
 
 ``` {r echo = FALSE}
 ggplot(AllComplaint) +
-  geom_bar( aes(x = Year, y = stat(count), fill = Offense.Description)) +
+  geom_bar( aes(x = Year, y = stat(count), fill = Offense_Description)) +
   theme(panel.grid = element_blank()) +
   scale_fill_brewer(palette = "Set1") +
   ylab("Number of Crimes") +
@@ -146,7 +146,7 @@ ggplot(AllComplaint) +
 ```
 
 ``` {r echo = FALSE}
-ggplot(AllComplaint, aes(x = Year, y = stat(count), fill = Offense.Description)) +
+ggplot(AllComplaint, aes(x = Year, y = stat(count), fill = Offense_Description)) +
   geom_bar(position = "fill") +
   theme(panel.grid = element_blank()) +
   scale_fill_brewer(palette = "Set1") +
@@ -156,8 +156,8 @@ ggplot(AllComplaint, aes(x = Year, y = stat(count), fill = Offense.Description))
 
 ``` {r echo = FALSE}
 ggplot(AllComplaint, aes(x = Year, y = (..count..))) +
-  geom_point(aes(col = Offense.Description),stat = "count") +
-  geom_line(aes(col = Offense.Description), stat = "count") +
+  geom_point(aes(col = Offense_Description),stat = "count") +
+  geom_line(aes(col = Offense_Description), stat = "count") +
   scale_color_brewer(palette = "Set1") +
   theme(panel.grid = element_blank()) +
   ylab("Number of Crimes") +
@@ -169,7 +169,7 @@ Robbery, assault level 3 & related offenses, and harrassment level 2 are the maj
 
 ``` {r echo = FALSE}
 ggplot(AllComplaint) +
-  geom_bar( aes(x = Year, y = stat(count), fill = Premises)) +
+  geom_bar( aes(x = Year, y = stat(count), fill = Premises_Description)) +
   theme(panel.grid = element_blank()) +
   scale_fill_brewer(palette = "Paired") +
   ylab("Number of Crimes") +
@@ -178,8 +178,8 @@ ggplot(AllComplaint) +
 
 ``` {r echo = FALSE}
 ggplot(AllComplaint, aes(x = Year, y = (..count..))) +
-  geom_point(aes(col = Premises),stat = "count") +
-  geom_line(aes(col = Premises), stat = "count") +
+  geom_point(aes(col = Premises_Description),stat = "count") +
+  geom_line(aes(col = Premises_Description), stat = "count") +
   scale_color_brewer(palette = "Paired") +
   theme(panel.grid = element_blank()) +
   ylab("Number of Crimes") +
@@ -190,7 +190,7 @@ Street crime takes majority of the total public crime complaints.
 
 
 
-##Insights, correlations and further investigations
+Insights, correlations and further investigations
 ===================================================
 
 The public crime complaints have dropped 16.38% over the years of 2010 to 2017. Crimes such as robbery and carrying dangerous weapons have shown significant decrease, while harrassment level 2 have increased sightly over the years.
