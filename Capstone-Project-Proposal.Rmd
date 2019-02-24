@@ -17,7 +17,7 @@
 
 **What data are you going to use for this? How will you acquire this data?**
 
-* Datasets from Crime reports in NYC are availabe at [NYC Opendata](https://data.cityofnewyork.us). I will be using the datasets of [Incident Level Complaint Data - 2006 through 2017](https://data.cityofnewyork.us/Public-Safety/NYPD-Complaint-Data-Historic/qgea-i56i) and [Incident Level Complaint Data - current year through most recent full quarter](https://data.cityofnewyork.us/Public-Safety/NYPD-Complaint-Data-Current-Year-To-Date-/5uac-w243). These two datasets contain the incident level complaint from the beginning of January 2010 to the end of June 2018. The variables that I will be working on will be borough, date of the complaint, time of the complaint, level of offense, description of the offense, description of the premise, suspect's age group, suspect's race, suspect's sex, victim's age group, victim's race, and victim's sex.
+* Datasets from Crime reports in NYC are availabe at [NYC Opendata](https://data.cityofnewyork.us). I will be using the datasets of [Incident Level Complaint Data - 2006 through 2017](https://data.cityofnewyork.us/Public-Safety/NYPD-Complaint-Data-Historic/qgea-i56i) The dataset contains: the incident level complaint from the beginning of January 2010 to the end of December 2017. The variables that I will be working on will be borough, date of the complaint, time of the complaint, level of offense, description of the offense, description of the premise, suspect's age group, suspect's race, suspect's sex, victim's age group, victim's race, and victim's sex.
 
 **In brief, outline your approach to solving this problem (knowing that this might change later).**
 
