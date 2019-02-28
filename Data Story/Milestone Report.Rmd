@@ -1,0 +1,527 @@
+---
+title: "Data Story"
+author: "Jeff Tsui"
+date: "February 24, 2019"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+  word_document: default
+always_allow_html: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Analysis on Public Crime That violate Pedestrians in New York City
+
+###*Introduction*
+Public Order Crime is an act that deviate the society's general ideas of normal social behavior and moral values. Different types of public crime can happen anywhere in the city, some borough have more crimes, other have less. By idenitifying the hotspots from the past criminal activities, it will bring caution to tourists and locals to be aware of a certain areas during certain times. 
+
+This project aim to explore and solve:
+
+*Have the public crime activity in New York City increased or decreased at the end of 2017?
+
+*Which borough in New York City have the most public crime activity that violate pedestrians?
+
+*Is there any correlation between public crime activity and weather temperature?
+
+*Which time period of the day (00:00 - 08:00, 08:01 - 16:00, or 16:01 - 24:00) has the most crime activity?
+
+*Where are the hotspots for public crimes that violate pedestrians?
+
+
+###*Data Acquisition*
+Datasets from Crime reports in NYC are availabe at [NYC Opendata](https://data.cityofnewyork.us). I will be using the datasets of [Incident Level Complaint Data - 2006 through 2017](https://data.cityofnewyork.us/Public-Safety/NYPD-Complaint-Data-Historic/qgea-i56i) The dataset contains: the incident level complaint from the beginning of January 2010 to the end of December 2017. The variables that I will be working on will be the boroughs, date of the complaints, time of the complaints, level of offenses, description of the offenses, description of the premises, suspect's age group, suspect's race, suspect's sex, victim's age group, victim's race, and victim's sex.
+
+Dataset of daily average temperature from 2010 to 2017 in New York City is obtained from [Weather Underground](https://www.wunderground.com/). 
+
+###*Important Fields and Information*
+According to the NY Police Department post on the [The New York Job Source](http://www.nyjobsource.com/nypd.html), the NYPD shifts are divided by three 8-hours and 35 minute shifts: 11:15 PM to 7:50 AM, 7:05 AM to 3:40 PM, and 3:00 PM tp 11:35 PM. But to simplify they call the shifts: (12 to 8), (8 to 4), and (4 to 12). I will be creating 3 time period of the day correspond to the police shifts to test out whih time period of the day has the most crime.
+
+###*Data Limitations*
+Since there isn't a specific whole area weather temperature for the entire New York City that includes all five boroughs on the historical data on the Weather Underground website. I took the average temperature of the most centered borough (Manhattan). 
+
+There are limited data on the suspect's age, race, and sex because there might be a case where the suspect was never caught. As well as there are limited data on the victim's age, race and sex because of the protection of personal information.
+
+None of the murder crimes have any premises description in the dataset of NYC Opendata, therefore none of them was included in this project.
+
+###*Data Cleaning and wrangling*
+The following packages was used for data cleaning and wrangling: `tidyr`, `dplyr`, `lubridate`, `chron`, and `zoo`.
+
+*Deleting useless columns by using e.g. df[, -c(1,2,3,4)].
+
+*Rearranging the columns by using e.g. df[, c(2,1,3,4)].
+
+*Renaming the columns to become more readible by using colnames.
+
+*Used the `select()` and `filter()` function from the `dplyr` package to filter out all premises except public premises: "PARK/PLAYGROUND", "PARKING LOT/GARAGE(PUBLIC)", "BUS (NYC TRANSIT)", "OPEN AREAS (OPEN LOTS)", "BUS STOP", "STREET", "TRANSIT - NYC SUBWAY", "PUBLIC BUILDING".
+
+*Used the `select()` and `filter()` function from the `dplyr` package to filter out all offensive except the ones that affects pedestrians: "ARSON", "ASSAULT & RELATED OFFENSES", "DANGEROUS WEAPONS", "FELONY ASSAULT", "HARRASSMENT", "KIDNAPPING", "MURDER & NON-NEGL. MANSLAUGHTER", "RAPE", "ROBBERY", "SEX CRIMES".
+
+*Used the `year` function from the `lubridate` package to add a new column for the year.
+
+*Used the `yearmon` function from the `zoo` package to add a new column for the year with month.
+
+*Used the `chron` function from the `chron` package to convert the rows in the Complaint time column into the formate of "h:m:s"
+
+###*Preliminary exploration*
+Load  the library
+```{r message = FALSE}
+library(dplyr)
+library(tidyr)
+library(scales)
+library(plyr)
+library(lubridate)
+library(ggplot2)
+library(zoo)
+library(gtools)
+library(chron)
+```
+
+
+Load the dataframe 
+``` {r echo = FALSE}
+AllComplaint <- read.csv("C:/Users/Jayden/Desktop/Springboard/Data-Wrangling-Capstone-Project/New/ComplaintTempFinal.csv", header = T)[,-1]
+AllComplaint$Year <- year(as.Date(AllComplaint$Complaint_Date, "%Y-%m-%d"))
+AllComplaint <- transform(AllComplaint, yearmon = as.yearmon(AllComplaint$Complaint_Date))
+AllComplaint<- AllComplaint[, c(1, 2, 16, 17, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)]
+colnames(AllComplaint)[colnames(AllComplaint) == "yearmon"] <- "Year_Month"
+
+
+Shift1 <- read.csv("C:/Users/Jayden/Desktop/Springboard/Data Story/Shifts/Shift1Final.csv", header = T, stringsAsFactors = F)[,-1]
+Shift1$Year <- year(as.Date(Shift1$Complaint_Date, "%Y-%m-%d"))
+Shift1 <- transform(Shift1, yearmon = as.yearmon(Shift1$Complaint_Date))
+Shift1<- Shift1[, c(1, 2, 16, 17, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)]
+colnames(Shift1)[colnames(Shift1) == "yearmon"] <- "Year_Month"
+
+Shift2 <- read.csv("C:/Users/Jayden/Desktop/Springboard/Data Story/Shifts/Shift2Final.csv", header = T, stringsAsFactors = F)[,-1]
+Shift2$Year <- year(as.Date(Shift2$Complaint_Date, "%Y-%m-%d"))
+Shift2 <- transform(Shift2, yearmon = as.yearmon(Shift2$Complaint_Date))
+Shift2<- Shift2[, c(1, 2, 16, 17, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)]
+colnames(Shift2)[colnames(Shift2) == "yearmon"] <- "Year_Month"
+
+Shift3 <- read.csv("C:/Users/Jayden/Desktop/Springboard/Data Story/Shifts/Shift3Final.csv", header = T, stringsAsFactors = F)[,-1]
+Shift3$Year <- year(as.Date(Shift3$Complaint_Date, "%Y-%m-%d"))
+Shift3 <- transform(Shift3, yearmon = as.yearmon(Shift3$Complaint_Date))
+Shift3<- Shift3[, c(1, 2, 16, 17, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)]
+colnames(Shift3)[colnames(Shift3) == "yearmon"] <- "Year_Month"
+```
+
+The dataframe only included the reported complaints of crimes that violates other people in the public. The public premises includes: "bus stop", "open areas (open lots)", "park/playground", "public buildings", "street", "transit (bus)", and "transit (subway)".  The public crimes includes: "arson", "assault and related offenses", "danagerous weapons", "felony assault", "harrassment", "kidnapping", "rape", "robbery", and "sex crimes". The complaint reported for public crimes are 11.8% of all reported crimes between 2010 to 2017.
+
+Analysis of Crime Complaints that happened in the Public that Violates Other People
+=====================================================================================
+
+``` {r echo = FALSE}
+ggplot(AllComplaint, aes(x = Year, y = (..count..))) + 
+  geom_bar(col = "Red") +
+  ylab("Number of Public Crimes Complaints") +
+  ggtitle("Total Public Crime Complaints Per Year Between 2010 to 2017") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+``` {r echo = FALSE}
+ggplot(data = AllComplaint, aes(Year)) + 
+  geom_line(stat = "count") + 
+  geom_point(stat = "count") + 
+  ylab("Number of Public Crimes Complaints") +
+  ggtitle("Total Public Crime Complaints Per Year Between 2010 to 2017") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+``` {r echo = TRUE}
+#Number of public crime complaints in 2010
+length(which(AllComplaint$Year == 2010))
+#Number of public crime complaints in 2017
+length(which(AllComplaint$Year == 2017))
+#The percentage change in public crime complaints from 2010 to 2017
+A <- length(which(AllComplaint$Year == 2010))
+B <- length(which(AllComplaint$Year == 2017))
+(A-B)/A
+```
+
+The line graph below shows the changes more clearly, there is a trend of decreasing public crimes between 2010 to 2017. 
+
+There is a 16.38% decrease of public crimes between 2010 to 2017.
+
+
+``` {r echo= FALSE, message = FALSE, warning = FALSE}
+ggplot(data = AllComplaint, aes(Year_Month)) + 
+  geom_line(stat = "count") + 
+  geom_point(stat = "count") + 
+  ylab("Number of Public Crimes Complaints") +
+  ggtitle("Total Public Crime Complaints Per Month Between 2010 to 2017") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+There is a trend of decrease in public crime complaints every year between the month of November, December, and January. The crime complaints start to increase after January and reaches the peak around the month of June and July of each year.
+
+
+``` {r echo = FALSE}
+ggplot((AllComplaint)) + 
+  geom_bar( aes(x = Borough, y =  (..count..)), col = "red") +
+  ylab("Number of Public Crimes Complaints") +
+  ggtitle("Total Public Crime Complaints Per Borough Between 2010 to 2017") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+According to the bar graph above. It clearly shown that Staten Island have significantly less public crime complaints than the other four boroughs. This could be the case of the size of population. According to the city population website, Staten Island only hold 5.6% of the New York City population. But Brookyln (31% NYC population) shows to have significantly more public crime complaints than other boroughs even when Queens (27% NYC population) have similar population size. Population size are determined by [City Population](https://www.citypopulation.de/php/usa-newyorkcity.php.)
+
+``` {r echo = FALSE, message = FALSE, warning = FALSE}
+ggplot(AllComplaint, aes(x = Year, fill = Borough)) +
+  geom_bar(position = "fill") +
+  scale_fill_brewer(palette = "Dark2")+
+  ylab("Percentage of The Total Number of Public Crimes Complaints") +
+  ggtitle("Percentage of Public Crime Complaints Annually For The Five Boroughs")
+
+ggplot(AllComplaint, aes(x = Year_Month, fill = Borough)) +
+  geom_bar(position = "fill") +
+  scale_fill_brewer(palette = "Dark2")+
+  ylab("Percentage of The Total Number of Public Crimes Complaints") +
+  ggtitle("Percentage of Public Crime Complaints Monthly For The Five Boroughs")
+```
+
+Both of the bar graph above shown that the percentage of public crime complaints for the five boroughs did not have any huge changes yearly or monthly. Bronx's public crime complaints averaged around a little less than 25% of the total number of complaints. Brooklyn's public crime complaints averaged around 30% of the total number of complaints. Manhattan and Queens averaged around 20% of the total number of complaints. Staten Island averaged a little less than 5% of the total number of compaint.
+
+
+``` {r echo = FALSE}
+ggplot(AllComplaint, aes(x = Year, y = (..count..))) +
+  geom_point(aes(col = Borough),stat = "count") +
+  geom_line(aes(col = Borough), stat = "count") +
+    scale_color_brewer(palette = "Dark2") +
+  theme(panel.grid = element_blank()) +
+  ylab("Number of Public Crimes Complaints") +
+  ggtitle("Annual Total Public Crime Complaints for The Five Boroughs") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+From the annual total public crime complaint line graph above, it had shown that Brookyln's public crime complaints have a more noticeable sight of decreasing over the years than the other boroughs.
+
+``` {r echo = TRUE}
+#Number of public crime complaints in 2010 For Bronx
+length(which(AllComplaint$Year== 2010 & AllComplaint$Borough == "BRONX"))
+#Number of public crime complaints in 2017 For Bronx
+length(which(AllComplaint$Year== 2017 & AllComplaint$Borough == "BRONX"))
+#The percentage change in public crime complaints from 2010 to 2017 in Bronx
+BX10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Borough == "BRONX"))
+BX17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Borough == "BRONX"))
+(BX10 - BX17)/BX10
+#Number of public crime complaints in 2010 For Brooklyn
+length(which(AllComplaint$Year== 2010 & AllComplaint$Borough == "BROOKLYN"))
+#Number of public crime complaints in 2017 For Brooklyn
+length(which(AllComplaint$Year== 2017 & AllComplaint$Borough == "BROOKLYN"))
+#The percentage change in public crime complaints from 2010 to 2017 in Brooklyn
+BN10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Borough == "BROOKLYN"))
+BN17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Borough == "BROOKLYN"))
+(BN10 - BN17)/BN10
+#Number of public crime complaints in 2010 For Manhattan
+length(which(AllComplaint$Year== 2010 & AllComplaint$Borough == "MANHATTAN"))
+#Number of public crime complaints in 2017 For Manhattan
+length(which(AllComplaint$Year== 2017 & AllComplaint$Borough == "MANHATTAN"))
+#The percentage change in public crime complaints from 2010 to 2017 in Manhattan
+MN10 <- length(which(AllComplaint$Year== 2010 | AllComplaint$Borough == "MANHATTAN"))
+MN17 <- length(which(AllComplaint$Year== 2017 | AllComplaint$Borough == "MANHATTAN"))
+(MN10 - MN17)/MN10
+#Number of public crime complaints in 2010 For Queens
+length(which(AllComplaint$Year== 2010 & AllComplaint$Borough == "QUEENS"))
+#Number of public crime complaints in 2017 For Queens
+length(which(AllComplaint$Year== 2017 & AllComplaint$Borough == "QUEENS"))
+#The percentage change in public crime complaints from 2010 to 2017 in Queens
+QS10 <- length(which(AllComplaint$Year== 2010 | AllComplaint$Borough == "QUEENS"))
+QS17 <- length(which(AllComplaint$Year== 2017 | AllComplaint$Borough == "QUEENS"))
+(QS10 - QS17)/QS10
+#Number of public crime complaints in 2010 For Staten Island
+length(which(AllComplaint$Year== 2010 & AllComplaint$Borough == "STATEN ISLAND"))
+#Number of public crime complaints in 2017 For Staten Island
+length(which(AllComplaint$Year== 2017 & AllComplaint$Borough == "STATEN ISLAND"))
+#The percentage change in public crime complaints from 2010 to 2017 in Staten Island
+SD10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Borough == "STATEN ISLAND"))
+SD17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Borough == "STATEN ISLAND"))
+(SD10 - SD17)/SD10
+```
+
+The public crime complaints have decreased for all five boroughs at the end of 2017 from 2010. Bronx with 17.3% decrease, Brooklyn with 22.2% decrease, Manhattan with 6.5% decrease, Queens with 5.8% decrease, and Staten Island with 27.5% decrease. Brooklyn still have the most public crime complaints even though its public crime complaints was decreased by 22.2% over the years, and Queens and Manhattan's public crime complaints have barely changed.  
+
+``` {r echo = FALSE}
+ggplot(AllComplaint, aes(x = as.Date(Year_Month), y = (..count..))) +
+  geom_point(aes(col = Borough),stat = "count") +
+  geom_line(aes(col = Borough), stat = "count") +
+  scale_color_brewer(palette = "Dark2") +
+  theme(panel.grid = element_blank()) +
+  xlab("Year") +
+  ylab("Number of Public Crimes Complaints") +
+  ggtitle("Total Public Crime Complaints Monthly for The Five Borough") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+The monthly complaints for the five boroughs line graph above once again shown that there is a significantly less public crime complaints during the month of November, December, and January. And there is a significantly more public crime complaints during the month of June, July, and August.
+
+``` {r echo = FALSE}
+ggplot(AllComplaint) +
+  geom_bar( aes(x = Offense_Description, y = stat(count)), col = "red") +
+  theme(panel.grid = element_blank()) +
+  scale_fill_brewer(palette = "Set1") +
+  xlab("Offense Description") +
+  ylab("Number of Public Crimes Complaints") +
+  ggtitle("Total Public Crime Complaints Annually Per Offense") +
+  coord_flip()
+
+Level <- AllComplaint$Level_of_Offense
+ggplot(AllComplaint) +
+  geom_bar( aes(x = Level, y = stat(count),fill = Offense_Description)) +
+  theme(panel.grid = element_blank()) +
+  scale_fill_brewer(palette = "Set1") +
+  xlab("Offense Description") +
+  ylab("Number of Public Crimes Complaints") +
+  ggtitle("Total Public Crime Complaints Annually Per Offense") 
+```
+
+In the world of Criminal Justice, violations are considered to be the most minor of offenses. Violations are punishable by a fine and will not result in any jail or prison time. Misdemeanor offenses are a more serious than violation offenses. Misdemeanor can result up to one year in jail. Felonies are the most offense out of the three. Felonies are seperated by letter (Class A - Class E). Class A felonies are the most serious and class E is the least. Punishable by class (A: up to life time in prison, B:25 years+, C: 10 - 25 years, D: 5 - 10 years, and E: 1 - 5 years). [Legal Dictionary](https://legaldictionary.net/felony/)
+
+Crimes such as arson, kidnapping, and rape are considered class A felonies, therefore those crimes are the minority among the total public crime complaints. Robbery and felony assault are considered class B felonies, which is the majority of the number of public crime complaints. Sex crime and in the possession of danerous weapons are mixture of felony and misdemeanor. Assault and related offenses are the majority of misdemeanor offenses. And harrassment is only considered as violation. 
+
+``` {r echo = FALSE}
+ggplot(AllComplaint, aes(x = Year, y = (..count..))) +
+  geom_point(aes(col = Offense_Description),stat = "count") +
+  geom_line(aes(col = Offense_Description), stat = "count") +
+  scale_color_brewer(palette = "Set1") +
+  theme(panel.grid = element_blank()) +
+  ylab("Number of Public Crimes Complaints") +
+  ggtitle("Annual Total Public Crime Complaints Per Offenses")
+```
+
+The annual total public crime complaints per offenses line graph above shown that harrassment and sex crimes had clearly increased. The possession of dangerous weapons and robbery had clearly decreased. But other offenses are hard to tell.
+
+``` {r echo = TRUE}
+#Number of public crime complaints in 2010 For arson 
+length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "ARSON"))
+#Number of public crime complaints in 2017 For arson
+length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "ARSON"))
+#The percentage change in public crime complaints from 2010 to 2017 in arson
+AN10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "ARSON"))
+AN17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "ARSON"))
+(AN10 - AN17)/AN10
+#Number of public crime complaints in 2010 For assault & related offenses
+length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "ASSAULT & RELATED OFFENSES"))
+#Number of public crime complaints in 2017 For assault & related offenses
+length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "ASSAULT & RELATED OFFENSES"))
+#The percentage change in public crime complaints from 2010 to 2017 in assault & related offenses
+AT10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "ASSAULT & RELATED OFFENSES"))
+AT17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "ASSAULT & RELATED OFFENSES"))
+(AT10 - AT17)/AT10
+#Number of public crime complaints in 2010 For dangerous weapons
+length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "DANGEROUS WEAPONS"))
+#Number of public crime complaints in 2017 For dangerous weapons
+length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "DANGEROUS WEAPONS"))
+#The percentage change in public crime complaints from 2010 to 2017 in dangerous weapons
+DW10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "DANGEROUS WEAPONS"))
+DW17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "DANGEROUS WEAPONS"))
+(DW10 - DW17)/DW10
+#Number of public crime complaints in 2010 For felony assault
+length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "FELONY ASSAULT"))
+#Number of public crime complaints in 2017 For felony assault
+length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "FELONY ASSAULT"))
+#The percentage change in public crime complaints from 2010 to 2017 in felony assault
+FA10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "FELONY ASSAULT"))
+FA17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "FELONY ASSAULT"))
+(FA10 - FA17)/FA10
+#Number of public crime complaints in 2010 For harrassment
+length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "HARRASSMENT "))
+#Number of public crime complaints in 2017 For harrassment
+length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "HARRASSMENT "))
+#The percentage change in public crime complaints from 2010 to 2017 in harrassment
+HT10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "HARRASSMENT "))
+HT17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "HARRASSMENT "))
+(HT10 - HT17)/HT10
+#Number of public crime complaints in 2010 For kidnapping
+length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "KIDNAPPING"))
+#Number of public crime complaints in 2017 For kidnapping
+length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "KIDNAPPING"))
+#The percentage change in public crime complaints from 2010 to 2017 in kidnapping
+KG10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "KIDNAPPING"))
+KG17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "KIDNAPPING"))
+(KG10 - KG17)/KG10
+#Number of public crime complaints in 2010 For rape
+length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "RAPE"))
+#Number of public crime complaints in 2017 For rape
+length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "RAPE"))
+#The percentage change in public crime complaints from 2010 to 2017 in rape
+RE10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "RAPE"))
+RE17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "RAPE"))
+(RE10 - RE17)/RE10
+#Number of public crime complaints in 2010 For robbery
+length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "ROBBERY"))
+#Number of public crime complaints in 2017 For robbery
+length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "ROBBERY"))
+#The percentage change in public crime complaints from 2010 to 2017 in robbery
+RY10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "ROBBERY"))
+RY17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "ROBBERY"))
+(RY10 - RY17)/RY10
+#Number of public crime complaints in 2010 For sex crimes
+length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "SEX CRIMES"))
+#Number of public crime complaints in 2017 For sex crimes
+length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "SEX CRIMES"))
+#The percentage change in public crime complaints from 2010 to 2017 in sex crimes
+SC10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "SEX CRIMES"))
+SC17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "SEX CRIMES"))
+(SC10 - SC17)/SC10
+```
+
+By using the functions and formula above, the percentage change in 2017 from 2010 can be shown, which helps to identify if the offense have decreased or increased. The percentage change in public crime complaints in 2017 from 2010: arson have decreased by 46.4%, assault & related offenses have decreased by 3.2%, possession of dangerous weapons have decreased by 46.7%, felony assault have decreased by 10.1%, harrassment have increased by 3.8%, kiddnapping have decreased by 31.3%, rape is unchanged, robbery have decreased by 38.6%, and sex crimes have increased by 25.6%.
+
+``` {r echo = FALSE}
+ggplot(AllComplaint) +
+  geom_bar( aes(x = Year, y = stat(count), fill = Premises_Description)) +
+  theme(panel.grid = element_blank()) +
+  scale_fill_brewer(palette = "Paired") +
+  ylab("Number of Public Crime Complaints") +
+  ggtitle("Total Public Crime Complaints Annually in Different Premises") 
+```
+
+Majority of the total public crime complaints are from the street.
+
+
+
+``` {r echo = FALSE, message = FALSE, warning = FALSE}
+ggplot(data = AllComplaint, aes(Year_Month)) + 
+  geom_line(stat = "count", col = "red") + 
+  geom_point(stat = "count", col = "red") + 
+  ylab("Number of Public Crime Complaints") +
+  ggtitle("Total Public Crime Complaints Per Month Between 2010 to 2017") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+Date <- AllComplaint$Complaint_Date
+Temperature <- AllComplaint$Average.Temperature
+ggplot(AllComplaint, aes(x = as.Date(Date), y = Temperature)) +
+  geom_point() +
+  scale_x_date(date_labels =  "%B-%Y", date_breaks = "1 year") +
+  ylim(0, 100) +
+  scale_y_continuous(breaks = c(10,20,30,40,50,60,70,80,90,100)) +
+  xlab("Year") +
+  ggtitle("Daily Average Temperature Between 2010 to 2017") +
+  theme(plot.title = element_text(hjust = 0.5))
+ 
+```
+![Daily Avg Temperature and Total Public Crime Complaint](Temp+Complaint.png)
+
+By compare the temperature with the total public crime The figure shows a strong correlation between the daily average temperature and total crime complaint over the year of 2010 to 2017. As the temperature decrease, the public crime decreases as well and as the temperature increase, the public crime complaints increases as well.
+
+
+``` {r echo = T}
+#Total public crime complaints during shift 1 
+nrow(Shift1)
+#Total public crime complaints during shift 2 
+nrow(Shift2)
+#Total public crime complaints during shift 3
+nrow(Shift3)
+```
+
+From the nrow function, Shift 3 (hour 16:00 - 24:00) was found to have the most public crime complaints. Shift 1 have 118733 complaints, shift 2 have 145766 complaints, and shift 3 have 197408 complaints.
+
+```{r echo = FALSE}
+ggplot((Shift1)) + 
+  geom_bar( aes(x = Borough, y =  (..count..)), fill = "red") +
+  ylab("Number of Public Crime Complaints") +
+  ylim(0, 65000) +
+  ggtitle("Public Crime Complaints Between 2010 to 2017 During Shift 1") 
+```
+
+```{r echo = FALSE}
+ggplot((Shift2)) + 
+  geom_bar( aes(x = Borough, y =  (..count..)), fill = "blue") +
+  ylab("Number of Public Crime Complaints") +
+  ylim(0, 65000) +
+  ggtitle("Public Crime Complaints Between 2010 to 2017 During Shift 2")
+```
+
+```{r echo = FALSE}
+ggplot((Shift3)) + 
+  geom_bar( aes(x = Borough, y =  (..count..)), fill ="green") +
+  ylab("Number of Public Crime Complaints") +
+  ylim(0, 65000) +
+  ggtitle("Public Crime Complaints Between 2010 to 2017 During Shift 3")
+```
+![Public Crime Complaints Per Borough Between 2010 to 2017 During all Shifts](Shifts.png)
+
+The image above shown that the number of public crime complaints in all five boroughs are in order for every shifts. Brooklyn always have the most compaints, Bronx always come second, Manhattan  always third, Queens fourth, and Staten Island always last.
+
+Load  the library for plotting heatmap
+```{r message = FALSE}
+library(ggplot2)
+library(ggthemes)
+library(viridis)
+library(ggmap)
+library(scales)
+library(grid)
+library(dplyr)
+library(gridExtra)
+library(tigris)
+library(leaflet)
+library(sp)
+library(maptools)
+library(broom)
+library(httr)
+library(rgdal)
+```
+
+``` {r echo = FALSE}
+Manhattan <- read.csv("C:/Users/Jayden/Desktop/Springboard/Data Story/MANHATTAN.csv", header = T)[,-1]
+Brooklyn <- read.csv("C:/Users/Jayden/Desktop/Springboard/Data Story/BROOKLYN.csv", header = T)[,-1]
+Bronx <- read.csv("C:/Users/Jayden/Desktop/Springboard/Data Story/BRONX.csv", header = T)[,-1]
+Queens <- read.csv("C:/Users/Jayden/Desktop/Springboard/Data Story/QUEENS.csv", header = T)[,-1]
+StatenIsland <- read.csv("C:/Users/Jayden/Desktop/Springboard/Data Story/STATEN ISLAND.csv", header = T)[,-1]
+```
+
+``` {r echo = FALSE, message = FALSE, warning = FALSE}
+Lat <- AllComplaint$Latitude
+Lon <- AllComplaint$Longitude 
+nyc_map1 <- get_map(location = c(lon = -74.00, lat = 40.71), maptype = "terrain", zoom = 11)
+nyc <- ggmap(nyc_map1)
+nyc + stat_density2d(data=AllComplaint, aes(x = Lon, y = Lat, fill = ..level.., alpha = ..level..), geom = "polygon", size =0.01, bins=10) +
+  ggtitle("New York City Heatmap") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+man_lon <- Manhattan$Longitude
+man_lat <- Manhattan$Latitude
+manhattan_map <- get_map(location = c(lon = -73.95, lat = 40.79), maptype = "terrain", zoom = 12)
+man <- ggmap(manhattan_map)
+man + stat_density2d(data=Manhattan, aes(x = man_lon, y = man_lat, fill = ..level.., alpha = ..level..), geom = "polygon", size =0.01, bins=10) +
+  ggtitle("Manhattan Heatmap") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+brook_lon <- Brooklyn$Longitude
+brook_lat <- Brooklyn$Latitude
+brooklyn_map <- get_map(location = c(lon = -73.94, lat = 40.68), maptype = "terrain", zoom = 11)
+brook <- ggmap(brooklyn_map)
+brook + stat_density2d(data=Brooklyn, aes(x = brook_lon, y = brook_lat, fill = ..level.., alpha = ..level..), geom = "polygon", size =0.01, bins=10) +
+  ggtitle("Brooklyn Heatmap") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+bronx_lon <- Bronx$Longitude
+bronx_lat <- Bronx$Latitude
+bronx_map <- get_map(location = c(lon = -73.86, lat = 40.84), maptype = "terrain", zoom = 12)
+bronx <- ggmap(bronx_map)
+bronx + stat_density2d(data=Bronx, aes(x = bronx_lon, y = bronx_lat, fill = ..level.., alpha = ..level..), geom = "polygon", size =0.01, bins=10) +
+  ggtitle("Bronx Heatmap") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+queens_lon <- Queens$Longitude
+queens_lat <- Queens$Latitude
+queens_map <- get_map(location = c(lon = -73.82, lat = 40.74), maptype = "terrain", zoom = 11)
+queens <- ggmap(queens_map)
+queens + stat_density2d(data=Queens, aes(x = queens_lon, y = queens_lat, fill = ..level.., alpha = ..level..), geom = "polygon", size =0.01, bins=10) +
+  ggtitle("Queens Heatmap") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+staten_lon <- StatenIsland$Longitude
+staten_lat <- StatenIsland$Latitude
+staten_map <- get_map(location = c(lon = -74.15, lat = 40.58), maptype = "terrain", zoom = 12)
+staten <- ggmap(staten_map)
+staten + stat_density2d(data=StatenIsland, aes(x = staten_lon, y = staten_lat, fill = ..level.., alpha = ..level..), geom = "polygon", size =0.01, bins=10) +
+  ggtitle("Staten Island Heatmap") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
