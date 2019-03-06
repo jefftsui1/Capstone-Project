@@ -1,0 +1,151 @@
+---
+title: "Machine Learning"
+author: "Jeff Tsui"
+date: "March 6, 2019"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Machine Learning
+Predicting the number of crime complaints using the the Linear Regression. It is a supervised regression model.
+
+The predictor that is used is the temperature of the day and the temperature of the month.
+
+I will be predicting the number of crime complaints daily and monthly.
+
+Load  the library
+```{r message = FALSE}
+library(dplyr)
+library(tidyr)
+library(lubridate)
+library(caTools)
+```
+
+
+Load the dataframe 
+``` {r echo = FALSE}
+Daily <- read.csv("C:/Users/Jayden/Desktop/Springboard/machine learning/Complaints Daily.csv", header = T)[,-1]
+Monthly <- read.csv("C:/Users/Jayden/Desktop/Springboard/machine learning/Complaints Monthly.csv", header = T)[,-1]
+```
+
+# Looking into the daily dataset
+```{r echo = FALSE}
+str(Daily)
+summary(Daily)
+plot(Daily)
+plot(Daily$Average_Temperature, Daily$Number_of_Complaints, main = "Daily Number of Complaints vs. Average Temperature", xlab = "Average Temperature (°F)", ylab = "Number of Complaints")
+abline(lm(Daily$Number_of_Complaints ~ Daily$Average_Temperature),col = "red")
+``` 
+
+The summary function show the minimum, 1st quartile, median, mean, 3rd quartile, and the maximum for number of complaints and average temperature. In the Daily Number of Complaints vs. Average Temperature plot, the best fit line is shown as red.
+
+# Splitting the data into training and testing data
+
+```{r echo = TRUE}
+set.seed(314)
+daily.split <- sample.split(Daily, SplitRatio = 0.7)
+daily.train <- subset(Daily, split = "TRUE")
+daily.test <- subset(Daily, split = "FALSE")
+```
+
+Splitting the data into 70% trainning data and 30% testing data.
+
+
+# Creating the model
+```{r echo = TRUE}
+daily.model <- lm(Number_of_Complaints ~ Average_Temperature, data = daily.train)
+summary(daily.model)
+```
+
+The summary of the daily.model show that average temperature is very significant by the significant codes. The multiple R-squared is 0.482.
+
+# Prediction
+```{r echo = TRUE}
+daily.pred <- predict(daily.model, daily.test)
+daily.pred
+```
+
+Running a prediction using the testing dataset. 
+
+# Comparing predicted vs actual values
+```{r echo = FALSE}
+plot(daily.pred, type = "l",lty = 1.8, col = "red")
+```
+
+```{r echo = FALSE}
+plot(daily.test$Number_of_Complaints, type = "l", lty = 1.8, col = "blue")
+lines(daily.pred, type = "l", col = "red")
+```
+
+The test number of crime complaints is in blue and the predictin is in red.
+
+#Finding the accuracy
+```{r echo = TRUE}
+daily.rmse <- sqrt(mean(daily.pred - Daily$Number_of_Complaints)^2)
+daily.rmse
+```
+
+The accuracy of this model is found by using the RMSE(Root Mean Square Deviation). The RMSE is 2.46279e-13
+
+# Looking into the monthly dataset
+```{r echo = FALSE}
+str(Monthly)
+summary(Monthly)
+plot(Monthly)
+plot(Monthly$Average_Temperature, Monthly$Number_of_Complaints, pch = 16, cex = 1.3, col = "blue", main = "Monthly Number of Complaints vs. Average Temperature", xlab = "Average Temperature (°F)", ylab = "Number of Complaints")
+abline(lm(Monthly$Number_of_Complaints ~ Monthly$Average_Temperature),col = "red")
+```
+
+In the Monthly Number of Complaints vs. Average Temperature plot, the best fit line is shown as red.
+
+# Splitting the data into training and test data
+
+```{r echo = TRUE}
+set.seed(314)
+monthly.split <- sample.split(Monthly, SplitRatio = 0.7)
+monthly.train <- subset(Monthly, split = "TRUE")
+monthly.test <- subset(Monthly, split = "FALSE")
+```
+
+Again the data is splitted into training set and a testing set. 70% is in the training dataset and 30% is in the testing dataset.
+
+# Creating the model
+```{r echo = TRUE}
+monthly.model <- lm(Number_of_Complaints ~ Average_Temperature, data = monthly.train)
+summary(monthly.model)
+```
+
+Again the average temperature is very significant due to the sigificant code. The multiple R-squared is 0.7862. The monthly model have a better correlation between average temperature and number of crime complaints than the daily model.
+
+# Prediction
+```{r echo = TRUE}
+monthly.pred <- predict(monthly.model, monthly.test)
+monthly.pred
+```
+
+Running a prediction using the testing dataset. 
+
+# Comparing predicted vs actual values
+```{r echo = FALSE}
+plot(monthly.pred, type = "l",lty = 1.8, col = "red")
+```
+
+```{r echo = FALSE}
+plot(monthly.test$Number_of_Complaints, type = "l", lty = 1.8, col = "blue")
+lines(monthly.pred, type = "l", col = "red")
+```
+
+The test number of crime complaints is in blue and the predictin is in red.
+
+#Finding the accuracy
+```{r echo = TRUE}
+monthly.rmse <- sqrt(mean(monthly.pred - Monthly$Number_of_Complaints)^2)
+monthly.rmse
+```
+
+The RMSE of the monthly model is 5.7327e-13 . The monthly model is have a better accuracy than the daily model.
