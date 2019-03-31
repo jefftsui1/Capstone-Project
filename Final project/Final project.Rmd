@@ -1,0 +1,1326 @@
+---
+title: "Capstone Final Report"
+author: "Jeff Tsui"
+date: "March 14, 2019"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+  word_document: default
+always_allow_html: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Linear Regression Model Analysis on Public Offenses in New York City
+
+##*Introduction*
+Public offenses can be defined as an act that deviates society's general ideas of normal social behavior and moral values. Different types of public crime can happen anywhere in the city. Some borough has more crimes, others has less. By identifying the hotspots from the past crime reports, it will bring caution to tourists and locals to be aware of a certain area during certain times. 
+
+This project aims to explore and solve:
+
+*Has the public crime activity in New York City increased or decreased at the end of 2017?
+
+*Which borough in New York City has the most public crime complaints?
+
+*Is there any correlation between public violent crime complaints and weather temperature?
+
+*Which police shift (00:00 - 08:00, 08:01 - 16:00, or 16:01 - 24:00) has the most crime activity?
+
+*Where are the hotspots for public offenses?
+
+##*Data Acquisition*
+Datasets from Crime reports in NYC are obtained at [NYC Opendata](https://data.cityofnewyork.us). I will be using the datasets of [Incident Level Complaint Data - 2006 through 2017](https://data.cityofnewyork.us/Public-Safety/NYPD-Complaint-Data-Historic/qgea-i56i) The dataset contains: the incident level complaints from the beginning of January 2010 to the end of December 2017. The variables that I will be working on will be the boroughs, date of the complaints, time of the complaints, level of offenses, description of the offenses, description of the premises, suspect's age group, suspect's race, suspect's sex, victim's age group, victim's race, and victim's sex.
+
+The dataset of daily average temperature and dataset of the day's precipitation greater than 3 inches from 2010 to 2017 in New York City is obtained from [Weather Underground](https://www.wunderground.com/). 
+
+Dataset of the federal holiday from the year 2010 to 2017 is obtained from [OfficeHolidays](https://www.officeholidays.com/index.php).
+
+Dateset of the public school closed from the year 2010 to 2017 is obtained from [National Council on Teacher Quality](https://www.nctq.org/).
+
+##*Important Fields and Information*
+According to the NY Police Department post on the [The New York Job Source](http://www.nyjobsource.com/nypd.html), the NYPD shifts are divided by three 8-hours and 35 minute shifts: 11:15 PM to 7:50 AM, 7:05 AM to 3:40 PM, and 3:00 PM to 11:35 PM. But to simplify they call the shifts: (12 to 8), (8 to 4), and (4 to 12). I will be creating 3 time periods of the day corresponding to the police shifts to test which time period of the day has the most crime.
+
+
+The dataframe only included the reported complaints for public offenses. The public premises include: "bus stop", "open areas (open lots)", "park/playground", "public buildings", "street", "transit (bus)", and "transit (subway)".  The public crimes includes: "arson", "assault and related offenses", "dangerous weapons", "felony assault", "harassment", "kidnapping", "rape", "robbery", and "sex crimes". The complaint reported for public crimes are 11.8% of all reported crimes between 2010 to 2017.
+
+In the world of Criminal Justice, violations are considered to be the minor offenses. Violations can be punishable by a fine and will not result in any jail or prison time. Misdemeanor offenses are more serious than violation offenses. Misdemeanor can result up to one year in jail. Felonies are the most serious offense out of the three. Felonies are separated by letter (Class A - Class E). Class A felonies are the most serious and class E is the least. The punishments are sorted by class (A: up to lifetime in prison, B:25 years+, C: 10 - 25 years, D: 5 - 10 years, and E: 1 - 5 years). [Legal Dictionary](https://legaldictionary.net/felony/)
+
+##*Data Limitations*
+There isn't a specific whole area weather temperature for the entire New York City that includes all five boroughs on the historical data on the Weather Underground website. I took the average temperature of the most centered borough (Manhattan). 
+
+The days that have precipitation greater than 3 inches could be anytime of the day. And it could be continuous or could be broken down into a several times of the day.
+
+There are limited data on the suspect's age, race, and sex because there might be a case where the suspect was never caught. Additionally, there are limited data on the victim's age, race and sex because of the protection of personal information.
+
+None of the murder crimes have any premises description in the dataset of NYC Opendata, therefore none of them were included in this research project. Murder crimes are minority of the complaints, but it could be spatially correlation in which it could affect the raw count in certain areas. Since murder crimes are the most serious crime that can happen to the victim, the lack of the murder crime data might impact the attention that the locals and tourists would have give. 
+
+##*Data Cleaning and wrangling*
+The following packages were used for data cleaning and wrangling: `tidyr`, `dplyr`, `lubridate`, `chron`, and `zoo`.
+
+*Deleting useless columns by using e.g. df[, -c(1,2,3,4)].
+
+*Rearranging the columns by using e.g. df[, c(2,1,3,4)].
+
+*Renaming the columns to become more readible by using colnames.
+
+*Used the `select()` and `filter()` function from the `dplyr` package to filter out all premises except public premises: "PARK/PLAYGROUND", "PARKING LOT/GARAGE(PUBLIC)", "BUS (NYC TRANSIT)", "OPEN AREAS (OPEN LOTS)", "BUS STOP", "STREET", "TRANSIT - NYC SUBWAY", "PUBLIC BUILDING".
+
+*Used the `select()` and `filter()` function from the `dplyr` package to filter out all offensive except the ones that affects pedestrians: "ARSON", "ASSAULT & RELATED OFFENSES", "DANGEROUS WEAPONS", "FELONY ASSAULT", "HARRASSMENT", "KIDNAPPING", "MURDER & NON-NEGL. MANSLAUGHTER", "RAPE", "ROBBERY", "SEX CRIMES".
+
+*Used the `year` function from the `lubridate` package to add a new column for the year.
+
+*Used the `yearmon` function from the `zoo` package to add a new column for the year with month.
+
+*Used the `chron` function from the `chron` package to convert the rows in the Complaint time column into the formate of "h:m:s"
+
+##*Preliminary exploration*
+Loading the library
+```{r message = FALSE}
+library(dplyr)
+library(tidyr)
+library(scales)
+library(ggplot2)
+library(plyr)
+library(lubridate)
+library(zoo)
+library(gtools)
+library(chron)
+```
+
+
+
+``` {r echo = FALSE}
+AllComplaint <- read.csv("C:/Users/Jayden/Desktop/Springboard/Data-Wrangling-Capstone-Project/New/ComplaintTempFinal2.csv", header = T)[,-1]
+AllComplaint$Year <- year(as.Date(AllComplaint$Complaint_Date, "%Y-%m-%d"))
+AllComplaint <- transform(AllComplaint, yearmon = as.yearmon(AllComplaint$Complaint_Date))
+AllComplaint<- AllComplaint[, c(1, 2, 16, 17, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)]
+colnames(AllComplaint)[colnames(AllComplaint) == "yearmon"] <- "Year_Month"
+
+
+Shift1 <- read.csv("C:/Users/Jayden/Desktop/Springboard/Data Story/Shifts/Shift1Final.csv", header = T, stringsAsFactors = F)[,-1]
+Shift1$Year <- year(as.Date(Shift1$Complaint_Date, "%Y-%m-%d"))
+Shift1 <- transform(Shift1, yearmon = as.yearmon(Shift1$Complaint_Date))
+Shift1<- Shift1[, c(1, 2, 16, 17, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)]
+colnames(Shift1)[colnames(Shift1) == "yearmon"] <- "Year_Month"
+
+Shift2 <- read.csv("C:/Users/Jayden/Desktop/Springboard/Data Story/Shifts/Shift2Final.csv", header = T, stringsAsFactors = F)[,-1]
+Shift2$Complaint_Date <- as.Date(Shift2$Complaint_Date, "%m/%d/%Y")
+Shift2$Year <- year(as.Date(Shift2$Complaint_Date, "%Y/%m/%d"))
+Shift2 <- transform(Shift2, yearmon = as.yearmon(Shift2$Complaint_Date))
+Shift2<- Shift2[, c(1, 2, 16, 17, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)]
+colnames(Shift2)[colnames(Shift2) == "yearmon"] <- "Year_Month"
+
+Shift3 <- read.csv("C:/Users/Jayden/Desktop/Springboard/Data Story/Shifts/Shift3Final.csv", header = T, stringsAsFactors = F)[,-1]
+Shift3$Year <- year(as.Date(Shift3$Complaint_Date, "%Y-%m-%d"))
+Shift3 <- transform(Shift3, yearmon = as.yearmon(Shift3$Complaint_Date))
+Shift3<- Shift3[, c(1, 2, 16, 17, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)]
+colnames(Shift3)[colnames(Shift3) == "yearmon"] <- "Year_Month"
+```
+
+
+Analysis of Violent or Potentially Violent Crime Complaints
+=====================================================================================
+###Exploring at the total public crime complaints annually between 2010 to 2017
+####By creating the bar graph below, the number of public crime complaints annually between 2010 - 2017 can be visualized.
+``` {r echo = FALSE}
+ggplot(AllComplaint, aes(x = Year, y = (..count..))) + 
+  geom_bar(col = "Red") +
+  ylab("Number of Public Crimes Complaints") +
+  ggtitle("Total Public Crime Complaints Per Year Between 2010 to 2017") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+####By creating the line graph below, the number of public crime complaints annually between 2010 - 2017 can be seen decreasing.
+``` {r echo = FALSE}
+ggplot(data = AllComplaint, aes(Year)) + 
+  geom_line(stat = "count") + 
+  geom_point(stat = "count") + 
+  ylab("Number of Public Crimes Complaints") +
+  ggtitle("Total Public Crime Complaints Per Year Between 2010 to 2017") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+####In order to find the percentage change between 2010 and 2017, the percentage change formula was used.
+``` {r echo = TRUE}
+##Number of public crime complaints in 2010
+#length(which(AllComplaint$Year == 2010))
+##Number of public crime complaints in 2017
+#length(which(AllComplaint$Year == 2017))
+##The percentage change in public crime complaints from 2010 to 2017
+#A <- length(which(AllComplaint$Year == 2010))
+#B <- length(which(AllComplaint$Year == 2017))
+#(A-B)/A
+```
+
+``` {r echo = FALSE}
+#Number of public crime complaints in 2010
+length(which(AllComplaint$Year == 2010))
+#Number of public crime complaints in 2017
+length(which(AllComplaint$Year == 2017))
+#The percentage change in public crime complaints from 2010 to 2017
+A <- length(which(AllComplaint$Year == 2010))
+B <- length(which(AllComplaint$Year == 2017))
+(A-B)/A
+```
+There is a decrease in crime complaints by looking at the first bar graph. But the line graph shows the changes more clearly that there is a decrease in public crimes between 2010 to 2017. By using the length, which function, the number of public crime complaints in 2010 and 2017 were found to be 62713 and 52440 respectively. The percentage change between 2010 and 2017 in public crime complaints is calculated to be 16.38%.
+
+
+###Exploring into the total public crime complaints monthly between 2010 to 2017
+###The total public crime complaints per month between 2010 to 2017 line graph below was created to see if there is any major changes through each of the year.
+``` {r echo= FALSE, message = FALSE, warning = FALSE}
+ggplot(data = AllComplaint, aes(Year_Month)) + 
+  geom_line(stat = "count") + 
+  geom_point(stat = "count") + 
+  ylab("Number of Public Crimes Complaints") +
+  ggtitle("Total Public Crime Complaints Per Month Between 2010 to 2017") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+There is a decreasing trend in public crime complaints every year between the month of November, December, and January. The crime complaints start to increase after January and reaches the peak around the month of June and July of each year and drop again after.
+
+###Exploring into the total public crime complaints per borough between the year 2010 to 2017
+####By creating a bar graph below, the total public crime complaints per borough between 2010 - 2017 can be visualized.
+``` {r echo = FALSE}
+ggplot((AllComplaint)) + 
+  geom_bar( aes(x = Borough, y =  (..count..)), col = "red") +
+  ylab("Number of Public Crimes Complaints") +
+  ggtitle("Total Public Crime Complaints Per Borough Between 2010 to 2017") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+According to the bar graph above, it clearly shown that Staten Island has significantly fewer public crime complaints than the other four boroughs. This is because of the size of population in the boroughs. According to the website (city population), Staten Island only hold 5.6% of the New York City population. But Brooklyn (population size of 2648771) shows to have significantly more public crime complaints than other boroughs even when Queens (population size of 2358582) has similar population size. Population size are determined by [City Population](https://www.citypopulation.de/php/usa-newyorkcity.php)
+![New York City Boroughs Population Estimate](Population.png)
+
+####The number of public crime complaints per 100 people was calculated for each borough to see which borough has the most complaints.
+```{r echo = TRUE}
+#(length(which(AllComplaint$Borough == "BRONX")) /1471160)*100
+#(length(which(AllComplaint$Borough == "BROOKLYN")) /2648771)*100
+#(length(which(AllComplaint$Borough == "MANHATTAN")) /1664727)*100
+#(length(which(AllComplaint$Borough == "QUEENS")) /2358582)*100
+#(length(which(AllComplaint$Borough == "STATEN ISLAND")) /479458)*100
+```
+
+```{r echo = FALSE}
+(length(which(AllComplaint$Borough == "BRONX")) /1471160)*100
+(length(which(AllComplaint$Borough == "BROOKLYN")) /2648771)*100
+(length(which(AllComplaint$Borough == "MANHATTAN")) /1664727)*100
+(length(which(AllComplaint$Borough == "QUEENS")) /2358582)*100
+(length(which(AllComplaint$Borough == "STATEN ISLAND")) /479458)*100
+```
+
+####The number of public crime complaints per 100 people bar graph is created below to show a clearer visualization.
+```{r echo= FALSE}
+a <- (length(which(AllComplaint$Borough == "BRONX")) /1471160)*100
+b <- (length(which(AllComplaint$Borough == "BROOKLYN")) /2648771)*100
+c <- (length(which(AllComplaint$Borough == "MANHATTAN")) /1664727)*100
+d <- (length(which(AllComplaint$Borough == "QUEENS")) /2358582)*100
+e <- (length(which(AllComplaint$Borough == "STATEN ISLAND")) /479458)*100
+Capita <- data.frame(name = c("BRONX", "BROOKLYN", "MANHATTAN", "QUEENS", "STATEN ISLAND"), value = c(a,b,c,d,e))
+
+ggplot(Capita, aes(x= name, y = value)) + geom_bar(stat = "identity") +
+  xlab("Boroughs") +
+  ylim(0, 10) +
+  ylab("Total Public Crimes Complaints per 100 people") +
+  ggtitle("Number of Public Crime Complaints per 100 people For Each Boroughs") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+The complaints per capita is found by dividing the total public crime complaints with the population size for each borough. From the year of 2010 to 2017, there is a public crime complaint rate of 7.5 per 100 people in Bronx, 5.4 per 100 people in Brooklyn, 6 per 100 people in Manhattan, 3.9 per 100 people in Queens, and 3.4 per 100 people in Staten Island. 
+
+The number of public crime complaints per 100 people for each boroughs bar graph show that Bronx has the most public crime complaints while Brooklyn has almost twice the amount of population. Staten Island has the least amount of population size and least amount of public crime complaints.
+
+####The percentage of public crime complaints annually and monthly for the five boroughs bar graph below was created to see if there is any major changes in the percentage of public crime complaints 
+``` {r echo = FALSE, message = FALSE, warning = FALSE}
+ggplot(AllComplaint, aes(x = Year, fill = Borough)) +
+  geom_bar(position = "fill") +
+  scale_fill_brewer(palette = "Dark2")+
+  ylab("Percentage of The Total Number of Public Crime Complaints") +
+  ggtitle("Percentage of Public Crime Complaints Annually For The Five Boroughs")
+
+ggplot(AllComplaint, aes(x = Year_Month, fill = Borough)) +
+  geom_bar(position = "fill") +
+  scale_fill_brewer(palette = "Dark2")+
+  ylab("Percentage of The Total Number of Public Crime Complaints") +
+  ggtitle("Percentage of Public Crime Complaints Monthly For The Five Boroughs")
+```
+
+Both of the percentage of public crime complaints for each boroughs bar graph above shown that the percentage of public crime complaints did not have any significant changes monthly or yearly. Bronx's public crime complaints averaged around a little less than 25% of the total number of complaints. Brooklyn's public crime complaints averaged around 30% of the total number of complaints. Manhattan and Queens averaged around 20% of the total number of complaints. Staten Island averaged a little less than 5% of the total number of complaints.
+
+####The line graph below shows a better visualization of whether the number of public crime complaints for the five boroughs increase or decrease.
+``` {r echo = FALSE}
+ggplot(AllComplaint, aes(x = Year, y = (..count..))) +
+  geom_point(aes(col = Borough),stat = "count") +
+  geom_line(aes(col = Borough), stat = "count") +
+    scale_color_brewer(palette = "Dark2") +
+  theme(panel.grid = element_blank()) +
+  ylab("Number of Public Crime Complaints") +
+  ggtitle("Annual Total Public Crime Complaints for The Five Boroughs") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+The annual total public crime complaints line graph above shown that Brooklyn's public crime complaints has a more noticeable sight of decrease over the years than the other boroughs. 
+
+####In order to find the percentage change for the five boroughs in 2010 and 2017, the percentage change formula was used.
+```{r}
+##Number of public crime complaints in 2010 for Bronx
+#length(which(AllComplaint$Year== 2010 & AllComplaint$Borough == "BRONX"))
+##Number of public crime complaints in 2017 for Bronx
+#length(which(AllComplaint$Year== 2017 & AllComplaint$Borough == "BRONX"))
+##The percentage change in public crime complaints between 2010 and 2017 in Bronx
+#BX10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Borough == "BRONX"))
+#BX17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Borough == "BRONX"))
+#(BX10 - BX17)/BX10
+
+##Number of public crime complaints in 2010 for Brooklyn
+#length(which(AllComplaint$Year== 2010 & AllComplaint$Borough == "BROOKLYN"))
+##Number of public crime complaints in 2017 for Brooklyn
+#length(which(AllComplaint$Year== 2017 & AllComplaint$Borough == "BROOKLYN"))
+##The percentage change in public crime complaints between 2010 and 2017 in Brooklyn
+#BN10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Borough == "BROOKLYN"))
+#BN17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Borough == "BROOKLYN"))
+#(BN10 - BN17)/BN10
+
+##Number of public crime complaints in 2010 for Manhattan
+#length(which(AllComplaint$Year== 2010 & AllComplaint$Borough == "MANHATTAN"))
+##Number of public crime complaints in 2017 for Manhattan
+#length(which(AllComplaint$Year== 2017 & AllComplaint$Borough == "MANHATTAN"))
+##The percentage change in public crime complaints between 2010 and 2017 in Manhattan
+#MN10 <- length(which(AllComplaint$Year== 2010 | AllComplaint$Borough == "MANHATTAN"))
+#MN17 <- length(which(AllComplaint$Year== 2017 | AllComplaint$Borough == "MANHATTAN"))
+#(MN10 - MN17)/MN10
+
+##Number of public crime complaints in 2010 for Queens
+#length(which(AllComplaint$Year== 2010 & AllComplaint$Borough == "QUEENS"))
+##Number of public crime complaints in 2017 for Queens
+#length(which(AllComplaint$Year== 2017 & AllComplaint$Borough == "QUEENS"))
+##The percentage change in public crime complaints betwen 2010 and 2017 in Queens
+#QS10 <- length(which(AllComplaint$Year== 2010 | AllComplaint$Borough == "QUEENS"))
+#QS17 <- length(which(AllComplaint$Year== 2017 | AllComplaint$Borough == "QUEENS"))
+#(QS10 - QS17)/QS10
+
+##Number of public crime complaints in 2010 for Staten Island
+#length(which(AllComplaint$Year== 2010 & AllComplaint$Borough == "STATEN ISLAND"))
+##Number of public crime complaints in 2017 for Staten Island
+#length(which(AllComplaint$Year== 2017 & AllComplaint$Borough == "STATEN ISLAND"))
+##The percentage change in public crime complaints between 2010 and 2017 in Staten Island
+#SD10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Borough == "STATEN ISLAND"))
+#SD17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Borough == "STATEN ISLAND"))
+#(SD10 - SD17)/SD10
+```
+
+``` {r echo = FALSE}
+length(which(AllComplaint$Year== 2010 & AllComplaint$Borough == "BRONX"))
+length(which(AllComplaint$Year== 2017 & AllComplaint$Borough == "BRONX"))
+BX10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Borough == "BRONX"))
+BX17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Borough == "BRONX"))
+(BX10 - BX17)/BX10
+
+length(which(AllComplaint$Year== 2010 & AllComplaint$Borough == "BROOKLYN"))
+length(which(AllComplaint$Year== 2017 & AllComplaint$Borough == "BROOKLYN"))
+BN10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Borough == "BROOKLYN"))
+BN17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Borough == "BROOKLYN"))
+(BN10 - BN17)/BN10
+
+length(which(AllComplaint$Year== 2010 & AllComplaint$Borough == "MANHATTAN"))
+length(which(AllComplaint$Year== 2017 & AllComplaint$Borough == "MANHATTAN"))
+MN10 <- length(which(AllComplaint$Year== 2010 | AllComplaint$Borough == "MANHATTAN"))
+MN17 <- length(which(AllComplaint$Year== 2017 | AllComplaint$Borough == "MANHATTAN"))
+(MN10 - MN17)/MN10
+
+length(which(AllComplaint$Year== 2010 & AllComplaint$Borough == "QUEENS"))
+length(which(AllComplaint$Year== 2017 & AllComplaint$Borough == "QUEENS"))
+QS10 <- length(which(AllComplaint$Year== 2010 | AllComplaint$Borough == "QUEENS"))
+QS17 <- length(which(AllComplaint$Year== 2017 | AllComplaint$Borough == "QUEENS"))
+(QS10 - QS17)/QS10
+
+length(which(AllComplaint$Year== 2010 & AllComplaint$Borough == "STATEN ISLAND"))
+length(which(AllComplaint$Year== 2017 & AllComplaint$Borough == "STATEN ISLAND"))
+SD10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Borough == "STATEN ISLAND"))
+SD17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Borough == "STATEN ISLAND"))
+(SD10 - SD17)/SD10
+```
+
+To determine if the number of public crime complaints have increased or decreased for each borough between 2010 and 2017, the percentage changes in public crime complaints between 2010 and 2017 is calculated. 
+
+The public crime complaints have decreased for all five boroughs at the end of 2017. Bronx decreased 17.3%, Brooklyn decreased 22.2%, Manhattan decreased 6.5%, Queens decreased 5.8%, and Staten Island decreased 27.5%.
+
+####The number of public crime complaints monthly for the five boroughs line graph below was created to see if there are any major changes in public crime complaints for the boroughs. 
+``` {r echo = FALSE}
+ggplot(AllComplaint, aes(x = as.Date(Year_Month), y = (..count..))) +
+  geom_point(aes(col = Borough),stat = "count") +
+  geom_line(aes(col = Borough), stat = "count") +
+  scale_color_brewer(palette = "Dark2") +
+  theme(panel.grid = element_blank()) +
+  xlab("Year") +
+  ylab("Number of Public Crime Complaints") +
+  ggtitle("Total Public Crime Complaints Monthly for The Five Boroughs") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+The monthly complaints for the five boroughs line graph above once again show that there is significantly fewer public crime complaints during the month of November, December, and January for each borough. And there are significantly more public crime complaints during the month of June, July, and August for each borough.
+
+###Exploring into the level of offenses and offenses description
+####The rotated bar graph below was created to compare the number of complaints for each of the offenses.
+``` {r echo = FALSE}
+ggplot(AllComplaint) +
+  geom_bar( aes(x = Offense_Description, y = stat(count)), col = "red") +
+  theme(panel.grid = element_blank()) +
+  scale_fill_brewer(palette = "Set1") +
+  xlab("Offense Description") +
+  ylab("Number of Public Crimes Complaints") +
+  ggtitle("Total Public Crime Complaints Annually Per Offense") +
+  coord_flip()
+```
+
+####The bar graph below was created to show the level for each of the offenses.
+``` {r echo = FALSE}
+Level <- AllComplaint$Level_of_Offense
+ggplot(AllComplaint) +
+  geom_bar( aes(x = Level, y = stat(count),fill = Offense_Description)) +
+  theme(panel.grid = element_blank()) +
+  scale_fill_brewer(palette = "Set1") +
+  xlab("Level of Offenses") +
+  ylab("Number of Public Crimes Complaints") +
+  ggtitle("Total Public Crime Complaints Annually Per Offense") 
+```
+
+Crimes such as arson, kidnapping, and rape are considered class A felonies, hence those crimes are the minority among the total public crime complaints. Robbery and felony assault are considered class B felonies, which is the majority of the number of public crime complaints. Sex crime and in the possession of dangerous weapons are mixture of felony and misdemeanor. Assault and related offenses are the majority of misdemeanor offenses. And harassment is only considered a violation. 
+
+####The line graph below was created to have a better visualization of whether the offenses have increase or decrease between the year 2010 to 2017.
+``` {r echo = FALSE}
+ggplot(AllComplaint, aes(x = Year, y = (..count..))) +
+  geom_point(aes(col = Offense_Description),stat = "count") +
+  geom_line(aes(col = Offense_Description), stat = "count") +
+  scale_color_brewer(palette = "Set1") +
+  theme(panel.grid = element_blank()) +
+  ylab("Number of Public Crimes Complaints") +
+  ggtitle("Annual Total Public Crime Complaints Per Offenses")
+```
+
+The annual total public crime complaints per offense line graph above shown that harassment and sex crimes had clearly increased. The possession of dangerous weapons and robbery had clearly decreased, but other offenses are hard to tell.
+
+####In order to find the percentage change for the all the offenses in 2010 and 2017, the percentage change formula was used.
+```{r}
+##Number of public crime complaints in 2010 for Arson 
+#length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "ARSON"))
+##Number of public crime complaints in 2017 for Arson 
+#length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "ARSON"))
+##The percentage change in public crime complaints between 2010 and 2017 for Arson
+#AN10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "ARSON"))
+#AN17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "ARSON"))
+#(AN10 - AN17)/AN10
+
+##Number of public crime complaints in 2010 for Assault & Related Offenses
+#length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "ASSAULT & RELATED OFFENSES"))
+##Number of public crime complaints in 2017 for Assault & Related Offenses
+#length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "ASSAULT & RELATED
+##The percentage change in public crime complaints between 2010 and 2017 for Assault & Related Offenses
+#AT10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "ASSAULT & RELATED OFFENSES"))
+#AT17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "ASSAULT & RELATED OFFENSES"))
+#(AT10 - AT17)/AT10
+
+##Number of public crime complaints in 2010 for Possession of Dangerous Weapons
+#length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "DANGEROUS WEAPONS"))
+##Number of public crime complaints in 2017 for Possession of Dangerous Weapons
+#length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "DANGEROUS WEAPONS"))
+##The percentage change in public crime complaints between 2010 and 2017 for Possession of Dangerous Weapons
+#DW10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "DANGEROUS WEAPONS"))
+#DW17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "DANGEROUS WEAPONS"))
+#(DW10 - DW17)/DW10
+
+##Number of public crime complaints in 2010 for Felony Assault
+#length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "FELONY ASSAULT"))
+##Number of public crime complaints in 2017 for Felony Assault
+#length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "FELONY ASSAULT"))
+##The percentage change in public crime complaints between 2010 and 2017 for Felony Assault
+#FA10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "FELONY ASSAULT"))
+#FA17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "FELONY ASSAULT"))
+#(FA10 - FA17)/FA10
+
+##Number of public crime complaints in 2010 for Harrassment
+#length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "HARRASSMENT "))
+##Number of public crime complaints in 2017 for Harrassment
+#length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "HARRASSMENT "))
+##The percentage change in public crime complaints between 2010 and 2017 for harrassment
+#HT10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "HARRASSMENT "))
+#HT17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "HARRASSMENT "))
+#(HT10 - HT17)/HT10
+
+##Number of public crime complaints in 2010 for Kidnapping
+#length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "KIDNAPPING"))
+##Number of public crime complaints in 2017 for Kidnapping
+#length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "KIDNAPPING"))
+##The percentage change in public crime complaints between 2010 and 2017 for kidnapping
+#KG10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "KIDNAPPING"))
+#KG17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "KIDNAPPING"))
+#(KG10 - KG17)/KG10
+
+
+##Number of public crime complaints in 2010 for Rape
+#length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "RAPE"))
+##Number of public crime complaints in 2017 for Rape
+#length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "RAPE"))
+##The percentage change in public crime complaints between 2010 and 2017 for Rape
+#RE10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "RAPE"))
+#RE17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "RAPE"))
+#(RE10 - RE17)/RE10
+
+##Number of public crime complaints in 2010 for Robbery
+#length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "ROBBERY"))
+##Number of public crime complaints in 2017 for Robbery
+#length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "ROBBERY"))
+##The percentage change in public crime complaints between 2010 and 2017 for robbery
+#RY10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "ROBBERY"))
+#RY17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "ROBBERY"))
+#(RY10 - RY17)/RY10
+
+##Number of public crime complaints in 2010 for Sex Crimes
+#length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "SEX CRIMES"))
+##Number of public crime complaints in 2017 for Sex Crimes
+#length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "SEX CRIMES"))
+##The percentage change in public crime complaints between 2010 and 2017 for sex crimes
+#SC10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "SEX CRIMES"))
+#SC17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "SEX CRIMES"))
+#(SC10 - SC17)/SC10
+```
+
+```{r echo = FALSE}
+length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "ARSON"))
+length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "ARSON"))
+AN10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "ARSON"))
+AN17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "ARSON"))
+(AN10 - AN17)/AN10
+
+length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "ASSAULT & RELATED OFFENSES"))
+length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "ASSAULT & RELATED OFFENSES"))
+AT10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "ASSAULT & RELATED OFFENSES"))
+AT17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "ASSAULT & RELATED OFFENSES"))
+(AT10 - AT17)/AT10
+
+length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "DANGEROUS WEAPONS"))
+length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "DANGEROUS WEAPONS"))
+DW10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "DANGEROUS WEAPONS"))
+DW17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "DANGEROUS WEAPONS"))
+(DW10 - DW17)/DW10
+
+length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "FELONY ASSAULT"))
+length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "FELONY ASSAULT"))
+FA10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "FELONY ASSAULT"))
+FA17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "FELONY ASSAULT"))
+(FA10 - FA17)/FA10
+
+length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "HARRASSMENT "))
+length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "HARRASSMENT "))
+HT10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "HARRASSMENT "))
+HT17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "HARRASSMENT "))
+(HT10 - HT17)/HT10
+
+length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "KIDNAPPING"))
+length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "KIDNAPPING"))
+KG10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "KIDNAPPING"))
+KG17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "KIDNAPPING"))
+(KG10 - KG17)/KG10
+
+length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "RAPE"))
+length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "RAPE"))
+RE10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "RAPE"))
+RE17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "RAPE"))
+(RE10 - RE17)/RE10
+
+length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "ROBBERY"))
+length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "ROBBERY"))
+RY10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "ROBBERY"))
+RY17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "ROBBERY"))
+(RY10 - RY17)/RY10
+
+length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "SEX CRIMES"))
+length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "SEX CRIMES"))
+SC10 <- length(which(AllComplaint$Year== 2010 & AllComplaint$Offense_Description == "SEX CRIMES"))
+SC17 <- length(which(AllComplaint$Year== 2017 & AllComplaint$Offense_Description == "SEX CRIMES"))
+(SC10 - SC17)/SC10
+```
+
+The percentage changes between 2010 and 2017 are once again calculated by using the formula above. It helps to identify whether the offenses have decreased or increased in percentage. The percentage change in public crime complaints in 2017 from 2010: arson has decreased by 46.4%, assault & related offenses has decreased by 3.2%, possession of dangerous weapons has decreased by 46.7%, felony assault has decreased by 10.1%, harassment has increased by 3.8%, kidnapping has decreased by 31.3%, rape is unchanged, robbery has decreased by 38.6%, and sex crimes has increased by 25.6%.
+
+###Exploring into the premises' description
+####The bar graphs below are created to visualize the annual number of public crime complaints in each premises and the percentage of the total public crime complaints annually in each premises. 
+``` {r echo = FALSE}
+ggplot(AllComplaint) +
+  geom_bar( aes(x = Year, y = stat(count), fill = Premises_Description)) +
+  theme(panel.grid = element_blank()) +
+  scale_fill_brewer(palette = "Paired") +
+  ylab("Number of Public Crime Complaints") +
+  ggtitle("Total Public Crime Complaints Annually in Different Premises") 
+
+ggplot(AllComplaint, aes(x = Year, fill = Premises_Description)) +
+  geom_bar(position = "fill") +
+  scale_fill_brewer(palette = "Paired") +
+  ylab("Percentage of Public Crime Complaints") +
+  ggtitle("Percentage of The Total Public Crime Complaints Annually in Different Premises") 
+
+```
+
+The majority of the total public crime complaints are from the street. Over the years, the percentage of street complaints has decreased while the percentage of transit - NYC subway has increased. 
+
+###Exploring into the suspect's age group, race, and sex
+####The bar graph below is created to visualize which suspect's age group has the most suspects
+``` {r echo = FALSE}
+ggplot(data = AllComplaint, aes(AllComplaint$Suspect_Age_Group)) + 
+  geom_bar(stat = "count", col = "red") +
+  xlab("Suspect's Age Group") +
+  ylab("Number of Public Crimes Complaints") +
+  ggtitle("Total Public Crime Complaints For Suspect's Age Group") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+Majority of the data is NA because the suspect wasn't caught or seen. Most of the suspects that were reported were in the age group of 25-44.
+
+####The bar graph below are created to visualize the suspect's race
+```{r echo = FALSE}
+ggplot(data = AllComplaint, aes(AllComplaint$Suspect_Race)) + 
+  geom_bar(stat = "count", col = "red") +
+  xlab("Suspect's Race") +
+  ylab("Number of Public Crimes Complaints") +
+  ggtitle("Total Public Crime Complaints For The Suspect's Race") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  coord_flip()
+```
+The majority of the suspects that were reported were Black.
+
+####The bar graphs below are created to visualize the suspect's race along with the boroughs
+```{r echo = FALSE}
+ggplot(AllComplaint) +
+  geom_bar( aes(x = AllComplaint$Suspect_Race, y = stat(count),fill = Borough)) +
+  theme(panel.grid = element_blank()) +
+  scale_fill_brewer(palette = "Dark2") +
+  xlab("Suspect's Race") +
+  ylab("Number of Public Crimes Complaints") +
+  ggtitle("Total Public Crime Complaints For The Suspect's Race")  +
+  coord_flip()
+```
+By looking more indepth on the suspect's race, I made a bar graph that shows the suspect's race along with each borough. There seems to be an interesting facts that Brooklyn has more Black and White suspects than any other boroughs and Queens has more Asian/Pacific Islander suspects than any other boroughs.
+
+####The bar graph below is created to visualize which of the suspect's sex group has the most suspects
+```{r echo = FALSE}
+ggplot(data = AllComplaint, aes(AllComplaint$Suspect_Sex)) + 
+  geom_bar(stat = "count", col = "red") +
+  xlab("Suspect's Sex") +
+  ylab("Number of Public Crimes Complaints") +
+  ggtitle("Total Public Crime Complaints For The Suspect's Sex") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+The majority of the suspects that were reported were males. There are four times more males suspects than female suspects.
+
+###Exploring into the victim's age group, race, and sex
+####The bar graph below is created to visualize which victim's age group has the most victims
+```{r echo = FALSE}
+ggplot(data = AllComplaint, aes(AllComplaint$Victim_Age_Group)) + 
+  geom_bar(stat = "count", col = "red") +
+  ylab("Number of Public Crimes Complaints") +
+  xlab("Victim's Age Group") +
+  ggtitle("Total Public Crime Complaints For Victim's Age Group") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+The age group of 25-44 is also the most total public crime complaint for the victim's age group.
+
+####The bar graphs below is created to visualize the victim's race along with the boroughs
+```{r echo = FALSE}
+ggplot(data = AllComplaint, aes(AllComplaint$Victim_Race)) + 
+  geom_bar(stat = "count", col = "red") +
+  xlab("Victim's Race") +
+  ylab("Number of Public Crimes Complaints") +
+  ggtitle("Total Public Crime Complaints For The Victim's Race") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  coord_flip()
+```
+Blacks are also the majority of the victim's race.
+
+```{r echo = FALSE}
+ggplot(AllComplaint) +
+  geom_bar( aes(x = AllComplaint$Victim_Race, y = stat(count),fill = Borough)) +
+  theme(panel.grid = element_blank()) +
+  scale_fill_brewer(palette = "Dark2") +
+  xlab("Victim Race") +
+  ylab("Number of Public Crimes Complaints") +
+  ggtitle("Total Public Crime Complaints For The Victim's Race")  +
+  coord_flip()
+```
+By looking more indepth on the victim's race, I made a bar graph that shows the victim's race along with each borough. There seems to be an interesting facts that Brooklyn also has more Black victims than any other boroughs and Queens has more Asian/Pacific Islander victims than any other boroughs.
+
+####The bar graph below is created to visualize which of the Victim's sex group has the most victim
+```{r echo = FALSE}
+ggplot(data = AllComplaint, aes(AllComplaint$Victim_Sex)) + 
+  geom_bar(stat = "count", col = "red") +
+  xlab("Victim's Sex") +
+  ylab("Number of Public Crimes Complaints") +
+  ggtitle("Total Public Crime Complaints For The Victim's Sex") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+There are a lot more female victims than female suspects.
+
+### Comparing average temperature of the day with number of crime complaints 
+``` {r echo = FALSE, message = FALSE, warning = FALSE}
+ggplot(data = AllComplaint, aes(as.Date(Year_Month))) + 
+  geom_line(stat= "count", col = "red") + 
+  geom_point(stat = "count", col = "red") + 
+  scale_x_date(date_labels =  "%B-%Y", date_breaks = "1 year") +
+  ylab("Number of Public Crime Complaints") +
+  xlab("Year") +
+  ggtitle("Total Public Crime Complaints Per Month Between 2010 to 2017") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+Date <- AllComplaint$Complaint_Date
+Temperature <- AllComplaint$Average.Temperature
+ggplot(AllComplaint, aes(x = as.Date(Date), y = Temperature)) +
+  geom_point() +
+  scale_x_date(date_labels =  "%B-%Y", date_breaks = "1 year") +
+  ylim(0, 100) +
+  scale_y_continuous(breaks = c(10,20,30,40,50,60,70,80,90,100)) +
+  xlab("Year") +
+  ggtitle("Daily Average Temperature Between 2010 to 2017") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+![Daily Avg Temperature and Total Public Crime Complaint](Temp+Complaint.png)
+
+By comparing the temperature with the total public crime complaints. We see a strong correlation between the daily average temperature and total crime complaint over the year of 2010 to 2017. As the temperature decreases, the public crime decreases as well and as the temperature increases, the public crime complaints increase as well.
+
+###Exploring into the three shifts (12 to 8), (8 to 4), and (4 to 12)
+####Using nrow function to find the number of public crime complaints in each shift
+``` {r echo = T}
+#Total public crime complaints during shift 1 
+nrow(Shift1)
+#Total public crime complaints during shift 2 
+nrow(Shift2)
+#Total public crime complaints during shift 3
+nrow(Shift3)
+```
+
+From the nrow function, Shift 3 (hour 16:00 - 24:00) was found to have the most public crime complaints. Shift 1 has 118733 complaints, shift 2 has 145766 complaints, and shift 3 has 197408 complaints.
+
+####The 3 bar graphs below is created to show the number of public crime complaints in each borough by shift and the stacked picture of the 3 shifts
+```{r echo = FALSE}
+ggplot((Shift1)) + 
+  geom_bar( aes(x = Borough, y =  (..count..)), fill = "red") +
+  ylab("Number of Public Crime Complaints") +
+  ylim(0, 65000) +
+  ggtitle("Public Crime Complaints Between 2010 to 2017 During Shift 1") 
+```
+
+```{r echo = FALSE}
+ggplot((Shift2)) + 
+  geom_bar( aes(x = Borough, y =  (..count..)), fill = "blue") +
+  ylab("Number of Public Crime Complaints") +
+  ylim(0, 65000) +
+  ggtitle("Public Crime Complaints Between 2010 to 2017 During Shift 2")
+```
+
+```{r echo = FALSE}
+ggplot((Shift3)) + 
+  geom_bar( aes(x = Borough, y =  (..count..)), fill ="green") +
+  ylab("Number of Public Crime Complaints") +
+  ylim(0, 65000) +
+  ggtitle("Public Crime Complaints Between 2010 to 2017 During Shift 3")
+```
+![Public Crime Complaints Per Borough Between 2010 to 2017 During all Shifts](Shifts.png)
+Graphs shows that Shift1 has the least amount of crime complaints, followed by Shift2 and Shift3 has the most amount of crime complaints. There are fewer public crime complaints in Bronx than Manhattan and about the same number of public crime complaints in Queens during Shift1. But Bronx surpasses Manhattan and Queens number of public crime complaints during Shift2 and Shift3.
+
+
+####The line graphs below is created to compare the number of public crime complaints monthly by shift 
+``` {r echo = FALSE, message = FALSE, warning = FALSE}
+ggplot(data = Shift1, aes(Year_Month)) + 
+  geom_line(stat = "count", col = "red") +
+  geom_point(stat = "count", col = "red") + 
+  ylim(500, 3000) +
+  xlab("Year by Month") +
+  ylab("Number of Public Crime Complaints") +
+  ggtitle("Total Public Crime Complaints Per Month During Shift 1") +
+  theme(plot.title = element_text(hjust = 0.5))
+ 
+ggplot(data = Shift2, aes(Year_Month)) + 
+  geom_line(stat = "count", col = "blue") +
+  geom_point(stat = "count", col = "blue") + 
+  ylim(500, 3000) +
+  xlab("Year by Month") +
+  ylab("Number of Public Crime Complaints") +
+  ggtitle("Total Public Crime Complaints Per Month During Shift 2") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggplot(data = Shift3, aes(Year_Month)) + 
+  geom_line(stat = "count", col = "green") +
+  geom_point(stat = "count", col = "green") + 
+  ylim(500, 3000) +
+  xlab("Year by Month") +
+  ylab("Number of Public Crime Complaints") +
+  ggtitle("Total Public Crime Complaints Per Month During Shift 3") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+![Total Public Crime Complaints Per Month Between Shifts](layer.png)
+the stacked line graph above shows that in every year during the month of June, July, and August, the number of crime complaints in shift1 spiked up while shift2 decreases. This could be effect of summer time, the average temperature is warmer and students are in summer vacations.
+
+
+Loading the library for plotting heatmap
+```{r message = FALSE}
+library(ggplot2)
+library(ggthemes)
+library(viridis)
+library(ggmap)
+library(scales)
+library(grid)
+library(gridExtra)
+library(tigris)
+library(leaflet)
+library(sp)
+library(maptools)
+library(broom)
+library(httr)
+library(rgdal)
+```
+
+``` {r echo = FALSE}
+register_google(key = "AIzaSyDUkHqG3g9Jcpxc-iiJLozLD8up7UV8KQo")
+Manhattan <- read.csv("C:/Users/Jayden/Desktop/Springboard/Data Story/MANHATTAN.csv", header = T)[,-1]
+Brooklyn <- read.csv("C:/Users/Jayden/Desktop/Springboard/Data Story/BROOKLYN.csv", header = T)[,-1]
+Bronx <- read.csv("C:/Users/Jayden/Desktop/Springboard/Data Story/BRONX.csv", header = T)[,-1]
+Queens <- read.csv("C:/Users/Jayden/Desktop/Springboard/Data Story/QUEENS.csv", header = T)[,-1]
+StatenIsland <- read.csv("C:/Users/Jayden/Desktop/Springboard/Data Story/STATEN ISLAND.csv", header = T)[,-1]
+
+
+Bronx_Shift1 <- read.csv("C:/Users/Jayden/Desktop/Springboard/Data Story/Shift1 Bronx.csv", header = T)[,-1]
+Brooklyn_Shift1 <- read.csv("C:/Users/Jayden/Desktop/Springboard/Data Story/Shift1 Brooklyn.csv", header = T)[,-1]
+Manhattan_Shift1 <- read.csv("C:/Users/Jayden/Desktop/Springboard/Data Story/Shift1 Manhattan.csv", header = T)[,-1]
+Queens_Shift1 <- read.csv("C:/Users/Jayden/Desktop/Springboard/Data Story/Shift1 Queens.csv", header = T)[,-1]
+StatenIsland_Shift1 <- read.csv("C:/Users/Jayden/Desktop/Springboard/Data Story/Shift1 StatenIsland.csv", header = T)[,-1]
+
+Bronx_Shift2 <- read.csv("C:/Users/Jayden/Desktop/Springboard/Data Story/Shift2 Bronx.csv", header = T)[,-1]
+Brooklyn_Shift2 <- read.csv("C:/Users/Jayden/Desktop/Springboard/Data Story/Shift2 Brooklyn.csv", header = T)[,-1]
+Manhattan_Shift2 <- read.csv("C:/Users/Jayden/Desktop/Springboard/Data Story/Shift2 Manhattan.csv", header = T)[,-1]
+Queens_Shift2 <- read.csv("C:/Users/Jayden/Desktop/Springboard/Data Story/Shift2 Queens.csv", header = T)[,-1]
+StatenIsland_Shift2 <- read.csv("C:/Users/Jayden/Desktop/Springboard/Data Story/Shift2 StatenIsland.csv", header = T)[,-1]
+
+Bronx_Shift3 <- read.csv("C:/Users/Jayden/Desktop/Springboard/Data Story/Shift3 Bronx.csv", header = T)[,-1]
+Brooklyn_Shift3 <- read.csv("C:/Users/Jayden/Desktop/Springboard/Data Story/Shift3 Brooklyn.csv", header = T)[,-1]
+Manhattan_Shift3 <- read.csv("C:/Users/Jayden/Desktop/Springboard/Data Story/Shift3 Manhattan.csv", header = T)[,-1]
+Queens_Shift3 <- read.csv("C:/Users/Jayden/Desktop/Springboard/Data Story/Shift3 Queens.csv", header = T)[,-1]
+StatenIsland_Shift3 <- read.csv("C:/Users/Jayden/Desktop/Springboard/Data Story/Shift3 StatenIsland.csv", header = T)[,-1]
+```
+
+##Exploring into the heatmap for NYC and each borough
+
+The heatmaps are created to raise the awarness of public crimes for the tourists and the locals.
+``` {r echo = FALSE, message = FALSE, warning = FALSE}
+Lat <- AllComplaint$Latitude
+Lon <- AllComplaint$Longitude 
+nyc_map1 <- get_map(location = c(lon = -73.90, lat = 40.71), maptype = "terrain", zoom = 10)
+nyc <- ggmap(nyc_map1)
+nyc + stat_density2d(data=AllComplaint, aes(x = Lon, y = Lat, fill = ..nlevel..),alpha = .1, geom = "polygon", size =0.5, bins=40) +
+  scale_fill_gradient(name = "level", low =  "green", high = "red") +
+  ggtitle("New York City Heatmap") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+The hotspots for crime complaints in New York City are in lower Manhattan, upper Manhattan, and lower left of Bronx.
+
+####The heatmap for Manhattan's crime complaints is created to find the hotspots
+``` {r echo = FALSE, message = FALSE, warning = FALSE}
+man_lon <- Manhattan$Longitude
+man_lat <- Manhattan$Latitude
+manhattan_map <- get_map(location = c(lon = -73.95, lat = 40.79), maptype = "terrain", zoom = 12)
+man <- ggmap(manhattan_map)
+man + stat_density2d(data=Manhattan, aes(x = man_lon, y = man_lat, fill = ..nlevel..), alpha = .1, geom = "polygon", size =0.5, bins=40) +
+  scale_fill_gradient(name = "level", low =  "green", high = "red") +
+  ggtitle("Manhattan Heatmap") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+The hotspots for crime complaints in Manhattan are in between Hell's Kitchen and midtown, and as well as in Harlem and upper Manhattan
+
+####The heatmap for Brooklyn's crime complaints is created to find the hotspots
+``` {r echo = FALSE, message = FALSE, warning = FALSE}
+brook_lon <- Brooklyn$Longitude
+brook_lat <- Brooklyn$Latitude
+brooklyn_map <- get_map(location = c(lon = -73.94, lat = 40.68), maptype = "terrain", zoom = 11)
+brook <- ggmap(brooklyn_map)
+brook + stat_density2d(data=Brooklyn, aes(x = brook_lon, y = brook_lat, fill = ..nlevel..), alpha = .1, geom = "polygon", size =0.5, bins=40) +
+  scale_fill_gradient(name = "level", low =  "green", high = "red") +
+  ggtitle("Brooklyn Heatmap") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+The hotspots for crime complaints in Brooklyn are everywhere in the middle of Brooklyn Height, Flatbush Ditmas Park and Highlands Park.
+
+####The heatmap for Bronx's crime complaints is created to find the hotspots
+``` {r echo = FALSE, message = FALSE, warning = FALSE}
+bronx_lon <- Bronx$Longitude
+bronx_lat <- Bronx$Latitude
+bronx_map <- get_map(location = c(lon = -73.86, lat = 40.84), maptype = "terrain", zoom = 12)
+bronx <- ggmap(bronx_map)
+bronx + stat_density_2d(data=Bronx, aes(x = bronx_lon, y = bronx_lat, fill = ..nlevel..), alpha = .1, geom = "polygon", size =0.5, bins=40) +
+  scale_fill_gradient(name = "level", low =  "green", high = "red") +
+  ggtitle("Bronx Heatmap") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+The hotspots for crime complaints in Bronx are Fordham Heights, Morrisania, Mott Haven, and Soundview.
+
+####The heatmap for Queens' crime complaints is created to find the hotspots
+``` {r echo = FALSE, message = FALSE, warning = FALSE}
+queens_lon <- Queens$Longitude
+queens_lat <- Queens$Latitude
+queens_map <- get_map(location = c(lon = -73.82, lat = 40.74), maptype = "terrain", zoom = 11)
+queens <- ggmap(queens_map)
+queens + stat_density2d(data=Queens, aes(x = queens_lon, y = queens_lat, fill = ..nlevel..), alpha = .1, geom = "polygon", size =0.5, bins=40) +
+  scale_fill_gradient(name = "level", low =  "green", high = "red") +
+  ggtitle("Queens Heatmap") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+The hotspots for crime complaints in Queens are in Jackson Heights and Jamaica.
+
+####The heatmap for Staten Island's crime complaints is created to find the hotspots
+``` {r echo = FALSE, message = FALSE, warning = FALSE}
+staten_lon <- StatenIsland$Longitude
+staten_lat <- StatenIsland$Latitude
+staten_map <- get_map(location = c(lon = -74.15, lat = 40.58), maptype = "terrain", zoom = 12)
+staten <- ggmap(staten_map)
+staten + stat_density2d(data=StatenIsland, aes(x = staten_lon, y = staten_lat, fill = ..nlevel..), alpha = .1, geom = "polygon", size =0.5, bins=40) +
+  scale_fill_gradient(name = "level", low =  "green", high = "red") +
+  ggtitle("Staten Island Heatmap") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+The hotspots for crime complaints in Staten Island are ST. George and snug Harbor Cultural Center & Botanical Garden.
+
+##Exploring into the heatmaps for each borough by shifts
+####Heatmap for Manhattan's crime complaints hotspots by shifts
+``` {r echo = FALSE, message = FALSE, warning = FALSE}
+Manhattan_lon_Shift1 <- Manhattan_Shift1$Longitude
+Manhattan_lat_Shift1 <- Manhattan_Shift1$Latitude
+Manhattan_lon_Shift2 <- Manhattan_Shift2$Longitude
+Manhattan_lat_Shift2 <- Manhattan_Shift2$Latitude
+Manhattan_lon_Shift3 <- Manhattan_Shift3$Longitude
+Manhattan_lat_Shift3 <- Manhattan_Shift3$Latitude
+
+man + stat_density2d(data = Manhattan_Shift1, aes(x = Manhattan_lon_Shift1, y = Manhattan_lat_Shift1, fill = ..nlevel..), alpha = .1, geom = "polygon", size =0.5, bins=40) +
+  scale_fill_gradient(name = "level", low =  "green", high = "red") +
+  ggtitle("Manhattan Shift 1 Heatmap") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+man + stat_density2d(data = Manhattan_Shift2, aes(x = Manhattan_lon_Shift2, y = Manhattan_lat_Shift2, fill = ..nlevel..), alpha = .1, geom = "polygon", size =0.5, bins=40) +
+  scale_fill_gradient(name = "level", low =  "green", high = "red") +
+  ggtitle("Manhattan Shift 2 Heatmap") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+man + stat_density2d(data = Manhattan_Shift3, aes(x = Manhattan_lon_Shift3, y = Manhattan_lat_Shift3, fill = ..nlevel..), alpha = .1, geom = "polygon", size =0.5, bins=40) +
+  scale_fill_gradient(name = "level", low =  "green", high = "red") +
+  ggtitle("Manhattan Shift 3 Heatmap") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+Shift1 Manhattan hotspots: Between Hell's Kitchen and Midtown, Lower Manhattan (Greenwich Village and Bowery).
+
+Shift2 Manhattan hotspots: Between Hell's Kitchen and Midtown, East Village, and between Harlem and East Harlem.
+
+Shift3 Manhattan hotspots: Between Hell's Kitchen and Midtown, and between Harlem and East Harlem.
+
+####Heatmap for Brooklyn's crime complaints hotspots by shifts
+``` {r echo = FALSE, message = FALSE, warning = FALSE}
+Brooklyn_lon_Shift1 <- Brooklyn_Shift1$Longitude
+Brooklyn_lat_Shift1 <- Brooklyn_Shift1$Latitude
+Brooklyn_lon_Shift2 <- Brooklyn_Shift2$Longitude
+Brooklyn_lat_Shift2 <- Brooklyn_Shift2$Latitude
+Brooklyn_lon_Shift3 <- Brooklyn_Shift3$Longitude
+Brooklyn_lat_Shift3 <- Brooklyn_Shift3$Latitude
+
+brook + stat_density2d(data=Brooklyn_Shift1, aes(x = Brooklyn_lon_Shift1, y = Brooklyn_lat_Shift1, fill = ..nlevel..), alpha = .1, geom = "polygon", size =0.5, bins=40) +
+  scale_fill_gradient(name = "level", low =  "green", high = "red") +
+  ggtitle("Brooklyn Shift 1 Heatmap") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+brook + stat_density2d(data=Brooklyn_Shift2, aes(x = Brooklyn_lon_Shift2, y = Brooklyn_lat_Shift2, fill = ..nlevel..), alpha = .1, geom = "polygon", size =0.5, bins=40) +
+  scale_fill_gradient(name = "level", low =  "green", high = "red") +
+  ggtitle("Brooklyn Shift 2 Heatmap") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+brook + stat_density2d(data=Brooklyn_Shift3, aes(x = Brooklyn_lon_Shift3, y = Brooklyn_lat_Shift3, fill = ..nlevel..), alpha = .1, geom = "polygon", size =0.5, bins=40) +
+  scale_fill_gradient(name = "level", low =  "green", high = "red") +
+  ggtitle("Brooklyn Shift 3 Heatmap") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+Shift1 Brooklyn hotspots: Sunset Park, Upper half of Brooklyn.
+
+Shift2 Brooklyn hotspots: Brooklyn Heights
+
+Shift3 Brooklyn hotspots: Upper half of Brooklyn.
+
+####Heatmap for Bronx's crime complaints hotspots by shifts
+``` {r echo = FALSE, message = FALSE, warning = FALSE}
+Bronx_lon_Shift1 <- Bronx_Shift1$Longitude
+Bronx_lat_Shift1 <- Bronx_Shift1$Latitude
+Bronx_lon_Shift2 <- Bronx_Shift2$Longitude
+Bronx_lat_Shift2 <- Bronx_Shift2$Latitude
+Bronx_lon_Shift3 <- Bronx_Shift3$Longitude
+Bronx_lat_Shift3 <- Bronx_Shift3$Latitude
+
+bronx + stat_density2d(data=Bronx_Shift1, aes(x = Bronx_lon_Shift1, y = Bronx_lat_Shift1, fill = ..nlevel..), alpha = .1, geom = "polygon", size =0.5, bins=40) +
+  scale_fill_gradient(name = "level", low =  "green", high = "red") +
+  ggtitle("Bronx Shift 1 Heatmap") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+bronx + stat_density2d(data=Bronx_Shift2, aes(x = Bronx_lon_Shift2, y = Bronx_lat_Shift2, fill = ..nlevel..), alpha = .1, geom = "polygon", size =0.5, bins=40) +
+  scale_fill_gradient(name = "level", low =  "green", high = "red") +
+  ggtitle("Bronx Shift 2 Heatmap") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+bronx + stat_density2d(data=Bronx_Shift3, aes(x = Bronx_lon_Shift3, y = Bronx_lat_Shift3, fill = ..nlevel..), alpha = .1, geom = "polygon", size =0.5, bins=40) +
+  scale_fill_gradient(name = "level", low =  "green", high = "red") +
+  ggtitle("Bronx Shift 3 Heatmap") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+Shift1 Bronx hotspots: Morris Heights, Highbridge, Mott Haven, Morrisania and Soundview.
+
+Shift2 Bronx hotspots: Morris Heights, Highbridge, Mott Haven, Morrisania and Soundview.
+
+Shift3 Bronx hotspots: Morris Heights, Highbridge
+
+####Heatmap for Queens's crime complaints hotspots by shifts
+``` {r echo = FALSE, message = FALSE, warning = FALSE}
+Queens_lon_Shift1 <- Queens_Shift1$Longitude
+Queens_lat_Shift1 <- Queens_Shift1$Latitude
+Queens_lon_Shift2 <- Queens_Shift2$Longitude
+Queens_lat_Shift2 <- Queens_Shift2$Latitude
+Queens_lon_Shift3 <- Queens_Shift3$Longitude
+Queens_lat_Shift3 <- Queens_Shift3$Latitude
+
+queens + stat_density2d(data= Queens_Shift1, aes(x = Queens_lon_Shift1, y = Queens_lat_Shift1, fill = ..nlevel..), alpha = .1, geom = "polygon", size =0.5, bins=40) +
+  scale_fill_gradient(name = "level", low =  "green", high = "red") +
+  ggtitle("Queens Shift 1 Heatmap") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+queens + stat_density2d(data= Queens_Shift2, aes(x = Queens_lon_Shift2, y = Queens_lat_Shift2, fill = ..nlevel..), alpha = .1, geom = "polygon", size =0.5, bins=40) +
+  scale_fill_gradient(name = "level", low =  "green", high = "red") +
+  ggtitle("Queens Shift 2 Heatmap") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+queens + stat_density2d(data= Queens_Shift3, aes(x = Queens_lon_Shift3, y = Queens_lat_Shift3, fill = ..nlevel..), alpha = .1, geom = "polygon", size =0.5, bins=40) +
+  scale_fill_gradient(name = "level", low =  "green", high = "red") +
+  ggtitle("Queens Shift 3 Heatmap") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+Shift1 Queens hotspots: Jackson Heights
+
+Shift2 Queens hotspots: Jamaica
+
+Shift3 Queens hotspots: Jackson Heights and Jamaica
+
+
+####Heatmap for Staten Island's crime complaints hotspots by shifts
+``` {r echo = FALSE, message = FALSE, warning = FALSE}
+StatenIsland_lon_Shift1 <- StatenIsland_Shift1$Longitude
+StatenIsland_lat_Shift1 <- StatenIsland_Shift1$Latitude
+StatenIsland_lon_Shift2 <- StatenIsland_Shift2$Longitude
+StatenIsland_lat_Shift2 <- StatenIsland_Shift2$Latitude
+StatenIsland_lon_Shift3 <- StatenIsland_Shift3$Longitude
+StatenIsland_lat_Shift3 <- StatenIsland_Shift3$Latitude
+
+staten + stat_density2d(data= StatenIsland_Shift1, aes(x = StatenIsland_lon_Shift1, y = StatenIsland_lat_Shift1, fill = ..nlevel..), alpha = .1, geom = "polygon", size =0.5, bins=40) +
+  scale_fill_gradient(name = "level", low =  "green", high = "red") +
+  ggtitle("Staten Island Shift 1 Heatmap") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+staten + stat_density2d(data= StatenIsland_Shift2, aes(x = StatenIsland_lon_Shift2, y = StatenIsland_lat_Shift2, fill = ..nlevel..), alpha = .1, geom = "polygon", size =0.5, bins=40) +
+  scale_fill_gradient(name = "level", low =  "green", high = "red") +
+  ggtitle("Staten Island Shift 2 Heatmap") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+staten + stat_density2d(data= StatenIsland_Shift3, aes(x = StatenIsland_lon_Shift3, y = StatenIsland_lat_Shift3, fill = ..nlevel..), alpha = .1, geom = "polygon", size =0.5, bins=40) +
+  scale_fill_gradient(name = "level", low =  "green", high = "red") +
+  ggtitle("Staten Island Shift 3 Heatmap") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+Shift1 Staten Island hotspots: ST George, Tompkinsville, and Snug Harbor Cultural Center & Botanical Garden.
+
+Shift2 Staten Island hotspots: ST George.
+
+Shift3 Staten Island hotspots: ST George, Tompkinsville, and Snug Harbor Cultural Center & Botanical Garden.
+
+
+
+
+##Machine Learning Linear Regression Model
+Loading the library
+``` {r echo = TRUE, message = FALSE, warning = FALSE}
+library(caTools)
+library(psych)
+```
+
+Loading the dataframe
+``` {r echo = FALSE}
+holiday <- read.csv("C:/Users/Jayden/Desktop/new daily precipitation 4.csv", header = T, stringsAsFactors = F)[,-c(1,10)]
+
+
+holiday$Complaint_Date <- lubridate::mdy(holiday$Complaint_Date)
+holiday <- holiday[order(as.Date(holiday$Complaint_Date, format = "%d/%m/%Y")),]
+holiday$Precipitation_Greater_3inches <- as.factor(holiday$Precipitation_Greater_3inches)
+holiday$Federal_Holidays_Description<- as.factor(holiday$Federal_Holidays_Description)
+holiday$Public_Schools_Closed_Description<- as.factor(holiday$Public_Schools_Closed_Description)
+holiday$Federal_Holidays <- as.factor(holiday$Federal_Holidays)
+holiday$Public_Schools_Closed<- as.factor(holiday$Public_Schools_Closed)
+```
+###Exploring in to precipitation, federal holidays, and public school closed
+####The str function is used to see the what format the variables are in
+```{r echo = TRUE}
+str(holiday)
+```
+The dataframe has 8 columns. The columns are: The complaint date, number of complaints of that day, average temperature of that day, if that day has precipitation greater than 3 inches, federal holidays descriptions, federal holidays, public schools closed descriptions, and public schools closed.
+Precipitation greater than 3 inches has two factor levels, if the day has a precipitation greater than 3 inches then it will be "1 Yes" and if not then it will be "0 No".
+Federal holidays have two factors levels, if the day is a federal holiday then it will be "1 Yes" and if not then it will be "0 No".
+Public Schools Closed have two factors levels, if public school is closed for the day then it will be "1 Yes" and if not then it will be "0 No".
+
+####The levels function is used to see all the levels in federal holidays and public schools closed variable
+```{r echo = TRUE}
+#18 factor levels of holiday description
+levels(holiday$Federal_Holidays_Description)
+#21 factor levels of public school closed description
+levels(holiday$Public_Schools_Closed_Description)
+```
+
+
+
+###Linear Regression Model with Number of complaints as dependent variable and average temperature of the day as independent variable and looking at the summary
+``` {r echo = FALSE}
+Avg.Temp <- lm(Number_of_Complaints~Average_Temperature, data = holiday)
+summary(Avg.Temp)
+confint(Avg.Temp)
+
+```
+By looking at the summary, I find that the average temperature is significant to number of complaints as the dependent variable ('***') according to the the significant codes. The summary shows a positive estimate, which means as the average temperature increase, the number of complaints increases as well. By using the confint function, the confident level of 95% forthe intercept and Average Temperature are stated.
+
+###Linear Regression Model with Number of complaints as dependent variable and precipitation greater than 3 inches as independent variables and looking at the summary
+``` {r echo = FALSE}
+Precipitation <- lm(Number_of_Complaints~Precipitation_Greater_3inches, data = holiday)
+summary(Precipitation)
+confint(Precipitation)
+```
+By looking at the summary, the precipitation greater than 3 inches as the independent variable is significant to number of complaints as the dependent variable ('***') according to the significant codes. The summary shows a negative estimate, which means when there is a day that has precipitation greater than 3 inches, the number of complaints decreases. By using the confint function, the confident level of 95% for the intercept and precipitation greater than 3 inches are stated.
+
+###Linear Regression Model with Number of complaints as dependent variable and Federal holiday description as independent variable and looking at the summary
+``` {r echo = FALSE}
+Fed.hol.desc <- lm(Number_of_Complaints~Federal_Holidays_Description, data = holiday)
+summary(Fed.hol.desc)
+confint(Fed.hol.desc)
+```
+By looking at the summary, the federal holidays descriptions as the independent variables have different significant factor level to number of complaints as the dependent variable. Factor levels of "Christmas Day", "Martin Luther King Jr. Day", "New Year", "Thanksgiving Day", and "Presidents' Day" are significant with ('3stars'). Factor levels of "Christmas Day (lieu)", "Day after Thanksgiving", "Independence Day", and "Labor Day" are significant with ('2stars'). Factor level of "Lincoln's Birthday" are significant with ('1star'). Factor level of "New Year's Day (lieu)" are significant with ('.'). Factor levels of "Columbus Day", "Election Day", "Independence Day (lieu)", "Memorial Day", "Veterans Day", and "Veterans Day (lieu)" are not significant at all. The summary shows a positive estimate on "New Year's Day", "Independence Day", and "Labor Day" for the significant independent variables. The summary shows a negative estimate on "Christmas Day", "Christmas Day (lieu)", "Day after Thanksgiving", "Lincoln's Birthday", "Martin Luther King Jr. Day", "New Year's Day (lieu)", "Presidents' Day", and "Thanksgiving Day". By using the confint function, the confidence level of 95% for intercept and all the federal holiday descriptions are stated.
+
+###Linear Regression Model with Number of complaints as dependent variable and Federal holiday as independent variable and looking at the summary
+``` {r echo = FALSE}
+Fed.hol <- lm(Number_of_Complaints~Federal_Holidays, data = holiday)
+summary(Fed.hol)
+confint(Fed.hol)
+```
+By looking at the summary, federal holiday as the independent variable is significant to number of complaints as the dependent variable ('***') according to the significant codes. The summary shows a negative estimate, which means when there is a federal holiday, the number of complaints decreases overall. By using the confint function, the confident level of 95% for the intercept and federal holidays are stated.
+
+###Linear Regression Model with Number of complaints as dependent variable and Public school closed descriptions as independent variable and looking at the summary
+``` {r echo = FALSE}
+Publ.Sch.Clo.Des <- lm(Number_of_Complaints~Public_Schools_Closed_Description, data = holiday)
+summary(Publ.Sch.Clo.Des)
+confint(Publ.Sch.Clo.Des)
+```
+By looking at the summary, the public school closed descriptions as the independent variables have different significant factor level to number of complaints as the dependent variable. Factor levels of "Midwinter Recess", "Martin Luther King Jr. Day", "Thanksgiving Recess", "Winter Recess", and "Presidents' Day" are significant with ('3stars'). Factor levels of "Summer Vacation" and " Labor Day" are significant with ('1star'). Factor levels of "Election Day" and "Spring Recess" are significant with ('.'). Factor levels of "Clerical Day", "Columbus Day", "al-Adha", "al-Fitr", "Good Friday", "Memorial Day", "Rosh Hashanah", "Veterans Day", "Weekend", and "Yom Kippur" are not significant at all. The summary shows a positive estimate on "Labor Day" and "Summer Vacation" for the significant independent variables. The summary shows a negative estimate on "Election Day", "Midwinter Recess", "Martin Luther King Jr. Day", "Presidents' Day", "Spring Recess", "Thanksgiving Recess", and "Winter Recess" for the significant independent variables. By using the confint function, the confident level of 95% for the intercept and public school closed descriptions are stated.
+
+###Linear Regression Model with Number of complaints as dependent variable and Public school closed as independent variable and looking at the summary
+``` {r echo = FALSE}
+Publ.Sch.Clo <- lm(Number_of_Complaints~Public_Schools_Closed, data = holiday)
+summary(Publ.Sch.Clo)
+confint(Publ.Sch.Clo)
+```
+By looking at the summary, public school closed as the independent variable is significant to number of complaints as the dependent variable ('.') according to the significant codes. The summary shows a positive estimate, which means when public school close, the number of complaints increases overall. By using the confint function, the confident level of 95% for the intercept and public schools closed are stated.
+
+
+###Linear Regression Model with Number of complaints as dependent variable and average temperature of the day with precipitation greater than 3 inches as independent variables and looking at the summary (Holiday.Model1)
+``` {r echo = FALSE}
+holiday.model1 <- lm(Number_of_Complaints~ Average_Temperature+Precipitation_Greater_3inches, data = holiday)
+summary(holiday.model1)
+confint(holiday.model1)
+```
+Both average temperature of the day and precipitation greater than 3 inches are significant to the number of complaints ('***'). The multiple R-square increased from 0.482 to 0.5262.
+
+###Linear Regression Model with Number of complaints as dependent variable and average temperature of the day with precipitation greater than 3 inches and federal holidays as independent variables and looking at the summary (Holiday.Model2)
+``` {r echo = FALSE}
+holiday.model2 <- lm(Number_of_Complaints~ Average_Temperature+Precipitation_Greater_3inches+Federal_Holidays, data = holiday)
+summary(holiday.model2)
+confint(holiday.model2)
+```
+The independent variable of average temperature of the day, precipitation greater than 3 inches, and federal holiday are significant to the number of complaints ('***'). The multiple R-square increased from 0.5262 to 0.5304.
+
+###Linear Regression Model with Number of complaints as dependent variable and average temperature of the day with precipitation greater than 3 inches, federal holidays, public school closed as independent variables and looking at the summary (Holiday.Model3)
+``` {r echo = FALSE}
+holiday.model3 <- lm(Number_of_Complaints~ Average_Temperature+Precipitation_Greater_3inches+Federal_Holidays+Public_Schools_Closed, data = holiday)
+summary(holiday.model3)
+confint(holiday.model3)
+```
+When the public school closed independent variable is added to the linear regression model, the federal holidays significance decreases to ('**'). All other independent variables have the significant code ('3stars'). The multiple R-square increased from 0.5304 to 0.5488.
+
+
+###RMSE(root mean square error) and AIC
+``` {r echo = TRUE}
+##RMSE for Holiday.Model1
+#SSE.model1 <- sum(holiday.model1$residuals^2)
+#SSE.model1
+#RMSE.model1 <- sqrt(SSE.model1/nrow(holiday))
+#RMSE.model1
+#AIC(holiday.model1)
+```
+
+``` {r echo = FALSE}
+##RMSE for Holiday.Model1
+SSE.model1 <- sum(holiday.model1$residuals^2)
+SSE.model1
+RMSE.model1 <- sqrt(SSE.model1/nrow(holiday))
+RMSE.model1
+AIC(holiday.model1)
+```
+
+``` {r echo = TRUE}
+##RMSE for Holiday.Model2
+#SSE.model2 <- sum(holiday.model2$residuals^2)
+#SSE.model2
+#RMSE.model2 <- sqrt(SSE.model2/nrow(holiday))
+#RMSE.model2
+#AIC(holiday.model2)
+```
+
+``` {r echo = FALSE}
+##RMSE for Holiday.Model2
+SSE.model2 <- sum(holiday.model2$residuals^2)
+SSE.model2
+RMSE.model2 <- sqrt(SSE.model2/nrow(holiday))
+RMSE.model2
+AIC(holiday.model2)
+```
+
+``` {r echo = TRUE}
+##RMSE for Holiday.Model3
+#SSE.model3 <- sum(holiday.model3$residuals^2)
+#SSE.model3
+#RMSE.model3 <- sqrt(SSE.model3/nrow(holiday))
+#RMSE.model3
+#AIC(holiday.model3)
+```
+
+``` {r echo = FALSE}
+##RMSE for Holiday.Model3
+SSE.model3 <- sum(holiday.model3$residuals^2)
+SSE.model3
+RMSE.model3 <- sqrt(SSE.model3/nrow(holiday))
+RMSE.model3
+AIC(holiday.model3)
+```
+The root mean square error and AIC are the least on model3 and the multiple r-squared is the largest in model3.
+
+### Splitting the data into training and test data
+```{r echo = TRUE}
+set.seed(314)
+holiday.split <- sample.split(holiday$Number_of_Complaints, SplitRatio =  0.80)
+holiday.train <- holiday[ holiday.split == TRUE, ]
+nrow(holiday.train)
+holiday.test <- holiday[ holiday.split == FALSE, ]
+nrow(holiday.test)
+```
+Accoring to the Pareto principle, the dataset is splitted into training set and testing set. 80% is in the training set and 20% is in the testing set.
+
+### Correlation covariance matrix
+```{r echo = FALSE}
+holiday2 <- holiday[, -c(1,5,7)]
+pairs.panels(holiday2)
+```
+Since public school closing is below |.1|, I will be leaving it out of the model.
+
+
+### Creating the model
+```{r echo = TRUE}
+holiday.model.train <- lm(Number_of_Complaints~ Average_Temperature+Precipitation_Greater_3inches+Federal_Holidays, data = holiday.train)
+summary(holiday.model.train)
+```
+The train model is created
+
+### Prediction
+```{r echo = TRUE}
+holiday.pred <- predict(holiday.model.train, holiday.test)
+```
+
+
+###Comparing predicted vs actual values
+```{r echo = FALSE}
+plot(holiday.test$Number_of_Complaints, type = "l", lty = 1.8, col = "blue", main = "Test Number of Complaints Set with Prediction", xlab = "Date", ylab = "Number of Complaints")
+lines(holiday.pred, type = "l", col = "red") 
+  
+```
+The test set number of complaints is in blue and the prediction set of complaints is in red. The prediction set of complaints has a very similar trend to the test set of complaints.
+
+```{r echo = FALSE}
+plot(holiday.pred, type = "l",lty = 1.8, col = "red", main = "Prediction Number of Complaints Set", xlab = "Date", ylab = "Number of Complaints")
+```
+Showing only the prediction
+
+##*Conclusion*
+
+At the end of 2017, the public crime complaints in New York City have decreased by 16.38%.
+
+Brooklyn is the borough in New York City that has the most public violent crime complaints, but Bronx has the greatest number of public violent crime complaints per capita. 
+
+By using the correlation covariance matrix, daily average temperature is found to have an correlation of 0.69. But other variable such as the daily precipitation greate than 3 inches and federal holidays are found to be correlated too with the correlation of -0.21 and -0.10 respectively. In the model that I created, the slope of the daily average temperature is 1.36, so 1 degree increase in Fahrenheit, it will increases the crime complaints by 1.36. Vice versa, when 1 degree decrease in Fahrenheit, it will decreases the crime complaints by 1.36. The daily precipitation greater than 3 inches have a slope of -23.95 and the federal holidays have a slope of -14.73.
+
+Most of the crime complaint reports are reported during Shift 3 (16:00 - 24:00).
+
+The heatmaps of each borough across time are shown above. For better visual of the hotspots, head to the "Exploring into the heatmap for NYC and each boroughs" section and "Exploring into the heatmaps for each borough by shift" section.
+
+```{echo = TRUE}
+New York City Hotspots: Lower Manhattan, Upper Manhattan, and Lower Left of Bronx. 
+
+Manhattan Hotspots: Between Hell's Kitchen and midtown, and as well as in Harlem and upper Manhattan.
+Manhattan During Shift 1 Hotspots: Between Hell's Kitchen and Midtown, Lower Manhattan 
+(Greenwich Village and Bowery).
+Manhattan During Shift 2 Hotspots: Between Hell's Kitchen and Midtown, East Village, and between
+Harlem and East Harlem.
+Manhattan During Shift 3 Hotspots: Between Hell's Kitchen and Midtown and between Harlem and 
+East Harlem.
+
+Brooklyn Hotspots: Everywhere in the middle of Brooklyn Height, Flatbush Ditmas Park and Highlands Park.
+Brooklyn During Shift 1 Hotspots: Sunset Park, Upper half of Brooklyn.
+Brooklyn During Shift 2 Hotspots: Brooklyn Heights.
+Brooklyn During Shift 3 Hotspots: Upper half of Brooklyn.
+
+Bronx Hotspots: Fordham Heights, Morrisania, Mott Haven, and Soundview.
+Bronx During Shift 1 Hotspots: Morris Heights, Highbridge, Mott Haven, Morrisania and Soundview.
+Bronx During Shift 2 Hotspots: Morris Heights, Highbridge, Mott Haven, Morrisania and Soundview.
+Bronx During Shift 3 Hotspots: Morris Heights, Highbridge.
+
+Queens Hotspots: Jackson Heights and Jamaica.
+Queens During Shift 1 Hotspots: Jackson Heights
+Queens During Shift 2 Hotspots: Jamaica
+Queens During Shift 3 Hotspots: Jackson Heights and Jamaica
+
+Staten Island Hotspots: ST. George and snug Harbor Cultural Center & Botanical Garden.
+Staten Island During Shift 1 Hotspots: ST George, Tompkinsville, and Snug Harbor Cultural Center 
+& Botanical Garden.
+Staten Island During Shift 2 Hotspots: ST George.
+Staten Island During Shift 3 Hotspots: ST George, Tompkinsville, and Snug Harbor Cultural Center 
+& Botanical Garden.
+```
+
+##*Further Research and Recommendations*
+
+A potential further work that could be added can be the use of the shiny application. By making a public shiny application of the heatmaps for the hotspots. Locals and tourists can look at the hotspots of violent crimes more easily for their own safety concerns. 
+
+Another further work that could be added can be a weighting scheme for how severe the crimes are and improving on the heatmap. Since crimes can be distinguished by their severe level, the more severe the crimes are then the more it should be weighted on the heatmap. One way to find how the crimes should be weighted, we can use the [Crime Severity Score data tool](https://www.ons.gov.uk/peoplepopulationandcommunity/crimeandjustice/datasets/crimeseverityscoredatatool) submitted by Mark Bangs. In his work, the list of weights provides the basis for deriving a severity score rather than comparing weights for individual offenses. Murder crimes are weighted 7973, which is the most severe crime out of the list.
+
+1. The police force can post up the heatmaps of the hotspots along with the crime complaint dataset to alert the locals and tourists about the public crimes.
+
+2. The police force can use the three shifts' data along with the heatmaps to determine and adjust the number of police on duty to patrol certain area.
+
+3. The police force can use the prediction of the linear regression model to determine and adjust the number of police on duty to patrol on that day.
